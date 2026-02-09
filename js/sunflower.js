@@ -74,6 +74,8 @@
   const elSpacingValue = document.getElementById('spacingValue');
   const elDotSize      = document.getElementById('dotSize');
   const elDotSizeValue = document.getElementById('dotSizeValue');
+  const elDotSizeMin   = document.getElementById('dotSizeMin');
+  const elDotSizeMinValue = document.getElementById('dotSizeMinValue');
   const elRadialPower  = document.getElementById('radialPower');
   const elRadialPowerValue = document.getElementById('radialPowerValue');
   const elCenterPacking = document.getElementById('centerPacking');
@@ -90,7 +92,7 @@
   const elFillDots     = document.getElementById('fillDots');
   const elColorSpirals = document.getElementById('colorSpirals');
   const elSpiralCountRow = document.getElementById('spiralCountRow');
-  const elGradientSize = document.getElementById('gradientSize');
+  const elSizeGradient = document.getElementById('sizeGradient');
   const elGoldenAngle  = document.getElementById('goldenAngle');
   const elGoldenAngleValue = document.getElementById('goldenAngleValue');
   const elSnapGoldenAngle = document.getElementById('snapGoldenAngle');
@@ -107,6 +109,12 @@
   const elResetDefaults = document.getElementById('resetDefaults');
   const elExportPNG    = document.getElementById('exportPNG');
   const elExportSVG    = document.getElementById('exportSVG');
+  const elExportDXF    = document.getElementById('exportDXF');
+  const elPresetName   = document.getElementById('presetName');
+  const elPresetSave   = document.getElementById('presetSave');
+  const elPresetList   = document.getElementById('presetList');
+  const elPresetLoad   = document.getElementById('presetLoad');
+  const elPresetDelete = document.getElementById('presetDelete');
   const elInfoStats    = document.getElementById('infoStats');
 
   // ─── Defaults ─────────────────────────────────────────
@@ -117,6 +125,7 @@
     spacing: 2.2,
     radialPower: 0.5,
     dotSize: 1.0,
+    dotSizeMin: 0.2,
     dotOpacity: 1.0,
     startAngle: 0,
     goldenAngle: GOLDEN_ANGLE_DEG,
@@ -132,7 +141,7 @@
     centerPacking: 0,
     fillDots: true,
     colorSpirals: false,
-    gradientSize: false
+    sizeGradient: 'none'
   };
 
   // Snap threshold for golden angle (degrees)
@@ -158,9 +167,12 @@
     const power     = parseFloat(elRadialPower.value);
     const packing   = parseFloat(elCenterPacking.value);
     const baseDotMM = parseFloat(elDotSize.value);
+    const minDotMM  = parseFloat(elDotSizeMin.value);
     const color     = elDotColor.value;
     const spiralCol = elColorSpirals.checked;
-    const gradSize  = elGradientSize.checked;
+    const gradMode   = elSizeGradient.value;  // 'none', 'inner-outer', 'outer-inner'
+    const gradSize   = gradMode !== 'none';
+    const reverseGrad = gradMode === 'outer-inner';
     const pattern   = elPatternType.value;
 
     const angleDeg  = parseFloat(elGoldenAngle.value);
@@ -181,14 +193,18 @@
         const rMM   = rMax * Math.pow(packed, power);
         const theta = i * angleRad + offsetRad + extraOffset;
 
-        // Dot radius
+        // Dot radius — interpolate between min and max based on gradient
         let dotRadMM = baseDotMM / 2;
-        if (pattern === 'pinecone' && gradSize) {
-          // Pinecone + gradient: smallest at center, largest at edge
-          const scale = parseFloat(elPineconeScale.value);
-          dotRadMM *= (1 - scale) + scale * t;
-        } else if (gradSize && rMax > 0) {
-          dotRadMM *= (0.3 + 0.7 * (rMM / rMax));
+        if (gradSize) {
+          const minRad = minDotMM / 2;
+          const maxRad = baseDotMM / 2;
+          let g = count > 1 ? i / (count - 1) : 0;  // 0=center, 1=edge
+          if (reverseGrad) g = 1 - g;  // flip: big at center, small at edge
+          if (pattern === 'pinecone') {
+            const scale = parseFloat(elPineconeScale.value);
+            g = (1 - scale) + scale * g;
+          }
+          dotRadMM = minRad + (maxRad - minRad) * g;
         }
 
         // Color
@@ -455,53 +471,38 @@
   function exportSVG() {
     const opacity = parseFloat(elDotOpacity.value);
     const fill = elFillDots.checked;
-    const cxMM = widthMM / 2;
-    const cyMM = heightMM / 2;
     const dots = computeDots();
 
-    let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${widthMM}mm" height="${heightMM}mm" viewBox="0 0 ${widthMM} ${heightMM}">\n`;
-    svg += `  <rect width="${widthMM}" height="${heightMM}" fill="white"/>\n`;
+    // Circular SVG: diameter = canvas dimension (use the smaller axis)
+    const svgRadius = Math.min(widthMM, heightMM) / 2;
+    const svgDiam   = svgRadius * 2;
+    const cx = svgRadius;
+    const cy = svgRadius;
 
-    // Grid lines
-    if (elShowGrid.checked) {
-      svg += `  <g stroke="#c8daf0" stroke-width="0.1">\n`;
-      for (let x = 0; x <= widthMM; x += 1) {
-        svg += `    <line x1="${x}" y1="0" x2="${x}" y2="${heightMM}"/>\n`;
-      }
-      for (let y = 0; y <= heightMM; y += 1) {
-        svg += `    <line x1="0" y1="${y}" x2="${widthMM}" y2="${y}"/>\n`;
-      }
-      svg += `  </g>\n`;
-    }
-    if (elShowMajorGrid.checked) {
-      svg += `  <g stroke="#90b0d8" stroke-width="0.25">\n`;
-      for (let x = 0; x <= widthMM; x += 10) {
-        svg += `    <line x1="${x}" y1="0" x2="${x}" y2="${heightMM}"/>\n`;
-      }
-      for (let y = 0; y <= heightMM; y += 10) {
-        svg += `    <line x1="0" y1="${y}" x2="${widthMM}" y2="${y}"/>\n`;
-      }
-      svg += `  </g>\n`;
-    }
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgDiam.toFixed(2)}mm" height="${svgDiam.toFixed(2)}mm" viewBox="0 0 ${svgDiam.toFixed(2)} ${svgDiam.toFixed(2)}">\n`;
+    svg += `  <defs>\n`;
+    svg += `    <clipPath id="circleClip">\n`;
+    svg += `      <circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${svgRadius.toFixed(2)}"/>\n`;
+    svg += `    </clipPath>\n`;
+    svg += `  </defs>\n`;
+    svg += `  <circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${svgRadius.toFixed(2)}" fill="white"/>\n`;
+    svg += `  <g clip-path="url(#circleClip)">\n`;
 
-    // Dots
+    // Dots (no grid in export — grid is canvas-only for preview)
     const pattern = elPatternType.value;
     for (const dot of dots) {
-      const cx = (cxMM + dot.xMM).toFixed(3);
-      const cy = (cyMM + dot.yMM).toFixed(3);
+      const dx = (cx + dot.xMM).toFixed(3);
+      const dy = (cy + dot.yMM).toFixed(3);
 
       if (pattern === 'pinecone') {
-        // Diamond shape oriented along radial direction
         const longR  = dot.radiusMM * 2;
         const shortR = dot.radiusMM * 0.9;
-        const angleDegSVG = (dot.theta * 180 / Math.PI).toFixed(2);
-        // Diamond points relative to center, then rotated
         const points = [
           [longR, 0], [0, shortR], [-longR, 0], [0, -shortR]
         ].map(([px, py]) => {
           const cos = Math.cos(dot.theta);
           const sin = Math.sin(dot.theta);
-          return `${(cxMM + dot.xMM + px * cos - py * sin).toFixed(3)},${(cyMM + dot.yMM + px * sin + py * cos).toFixed(3)}`;
+          return `${(cx + dot.xMM + px * cos - py * sin).toFixed(3)},${(cy + dot.yMM + px * sin + py * cos).toFixed(3)}`;
         }).join(' ');
 
         if (fill) {
@@ -511,21 +512,246 @@
         }
       } else {
         if (fill) {
-          svg += `    <circle cx="${cx}" cy="${cy}" r="${dot.radiusMM.toFixed(3)}" fill="${dot.color}" opacity="${opacity}"/>\n`;
+          svg += `    <circle cx="${dx}" cy="${dy}" r="${dot.radiusMM.toFixed(3)}" fill="${dot.color}" opacity="${opacity}"/>\n`;
         } else {
-          svg += `    <circle cx="${cx}" cy="${cy}" r="${dot.radiusMM.toFixed(3)}" fill="none" stroke="${dot.color}" stroke-width="0.15" opacity="${opacity}"/>\n`;
+          svg += `    <circle cx="${dx}" cy="${dy}" r="${dot.radiusMM.toFixed(3)}" fill="none" stroke="${dot.color}" stroke-width="0.15" opacity="${opacity}"/>\n`;
         }
       }
     }
 
+    svg += `  </g>\n`;
+    // Center crosshair (2mm arms) for CAD alignment
+    const arm = 2;
+    svg += `  <line x1="${(cx - arm).toFixed(2)}" y1="${cy.toFixed(2)}" x2="${(cx + arm).toFixed(2)}" y2="${cy.toFixed(2)}" stroke="#333" stroke-width="0.15"/>\n`;
+    svg += `  <line x1="${cx.toFixed(2)}" y1="${(cy - arm).toFixed(2)}" x2="${cx.toFixed(2)}" y2="${(cy + arm).toFixed(2)}" stroke="#333" stroke-width="0.15"/>\n`;
+    // Outer circle border
+    svg += `  <circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${svgRadius.toFixed(2)}" fill="none" stroke="#333" stroke-width="0.25"/>\n`;
     svg += `</svg>`;
 
     const blob = new Blob([svg], { type: 'image/svg+xml' });
     const link = document.createElement('a');
-    link.download = `${pattern}_${widthMM}x${heightMM}mm.svg`;
+    const diamLabel = (svgDiam).toFixed(0);
+    link.download = `${pattern}_circle_${diamLabel}mm.svg`;
     link.href = URL.createObjectURL(blob);
     link.click();
     URL.revokeObjectURL(link.href);
+  }
+
+  // ─── Export: DXF ──────────────────────────────────────
+
+  function exportDXF() {
+    const dots = computeDots();
+    const pattern = elPatternType.value;
+
+    // Compute circular boundary: diameter = canvas dimension (smaller axis)
+    const outerR = Math.min(widthMM, heightMM) / 2;
+
+    // DXF helper: emit a CIRCLE entity
+    function dxfCircle(x, y, r, layer) {
+      return `0\nCIRCLE\n8\n${layer}\n10\n${x.toFixed(4)}\n20\n${y.toFixed(4)}\n30\n0.0\n40\n${r.toFixed(4)}\n`;
+    }
+
+    // DXF helper: emit a closed LWPOLYLINE (4 vertices for diamond)
+    function dxfDiamond(cx, cy, theta, longR, shortR, layer) {
+      const cos = Math.cos(theta);
+      const sin = Math.sin(theta);
+      const pts = [
+        [longR, 0], [0, shortR], [-longR, 0], [0, -shortR]
+      ].map(([px, py]) => [
+        cx + px * cos - py * sin,
+        cy + px * sin + py * cos
+      ]);
+      let s = `0\nLWPOLYLINE\n8\n${layer}\n90\n4\n70\n1\n`; // 70=1 → closed
+      for (const [x, y] of pts) {
+        s += `10\n${x.toFixed(4)}\n20\n${y.toFixed(4)}\n`;
+      }
+      return s;
+    }
+
+    // DXF helper: emit a LINE entity
+    function dxfLine(x1, y1, x2, y2, layer) {
+      return `0\nLINE\n8\n${layer}\n10\n${x1.toFixed(4)}\n20\n${y1.toFixed(4)}\n30\n0.0\n11\n${x2.toFixed(4)}\n21\n${y2.toFixed(4)}\n31\n0.0\n`;
+    }
+
+    // Build DXF content
+    let dxf = '';
+
+    // HEADER section (minimal — set units to mm)
+    dxf += '0\nSECTION\n2\nHEADER\n';
+    dxf += '9\n$INSUNITS\n70\n4\n';       // 4 = millimeters
+    dxf += '9\n$MEASUREMENT\n70\n1\n';    // 1 = metric
+    dxf += '0\nENDSEC\n';
+
+    // TABLES section (define layers)
+    dxf += '0\nSECTION\n2\nTABLES\n';
+    dxf += '0\nTABLE\n2\nLAYER\n70\n3\n';
+    // Dots layer
+    dxf += '0\nLAYER\n2\nDOTS\n70\n0\n62\n7\n6\nCONTINUOUS\n';
+    // Border layer
+    dxf += '0\nLAYER\n2\nBORDER\n70\n0\n62\n5\n6\nCONTINUOUS\n';
+    // Center layer
+    dxf += '0\nLAYER\n2\nCENTER\n70\n0\n62\n1\n6\nCENTER\n';
+    dxf += '0\nENDTAB\n';
+    dxf += '0\nENDSEC\n';
+
+    // ENTITIES section
+    dxf += '0\nSECTION\n2\nENTITIES\n';
+
+    // Dots
+    for (const dot of dots) {
+      if (pattern === 'pinecone') {
+        const longR  = dot.radiusMM * 2;
+        const shortR = dot.radiusMM * 0.9;
+        dxf += dxfDiamond(dot.xMM, dot.yMM, dot.theta, longR, shortR, 'DOTS');
+      } else {
+        dxf += dxfCircle(dot.xMM, dot.yMM, dot.radiusMM, 'DOTS');
+      }
+    }
+
+    // Outer circle border
+    dxf += dxfCircle(0, 0, outerR, 'BORDER');
+
+    // Center crosshair (2mm arms)
+    const arm = 2;
+    dxf += dxfLine(-arm, 0, arm, 0, 'CENTER');
+    dxf += dxfLine(0, -arm, 0, arm, 'CENTER');
+
+    dxf += '0\nENDSEC\n';
+    dxf += '0\nEOF\n';
+
+    const blob = new Blob([dxf], { type: 'application/dxf' });
+    const link = document.createElement('a');
+    const diamLabel = (outerR * 2).toFixed(0);
+    link.download = `${pattern}_circle_${diamLabel}mm.dxf`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
+  // ─── Presets (localStorage) ─────────────────────────
+
+  const PRESETS_KEY = 'sunflower-presets';
+
+  function getPresets() {
+    try {
+      return JSON.parse(localStorage.getItem(PRESETS_KEY)) || {};
+    } catch { return {}; }
+  }
+
+  function setPresets(presets) {
+    localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+  }
+
+  function refreshPresetList() {
+    const presets = getPresets();
+    const names = Object.keys(presets).sort();
+    elPresetList.innerHTML = '<option value="">— Select preset —</option>';
+    for (const name of names) {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      elPresetList.appendChild(opt);
+    }
+  }
+
+  function savePreset(name) {
+    if (!name) return;
+    const config = {
+      canvasWidth:   parseFloat(elCanvasWidth.value),
+      canvasHeight:  parseFloat(elCanvasHeight.value),
+      numDots:       parseInt(elNumDots.value, 10),
+      spacing:       parseFloat(elSpacing.value),
+      radialPower:   parseFloat(elRadialPower.value),
+      dotSize:       parseFloat(elDotSize.value),
+      dotSizeMin:    parseFloat(elDotSizeMin.value),
+      dotOpacity:    parseFloat(elDotOpacity.value),
+      startAngle:    parseInt(elStartAngle.value, 10),
+      goldenAngle:   parseFloat(elGoldenAngle.value),
+      showGrid:      elShowGrid.checked,
+      showMajorGrid: elShowMajorGrid.checked,
+      showAxes:      elShowAxes.checked,
+      showLabels:    elShowLabels.checked,
+      dotColor:      elDotColor.value,
+      dotColor2:     elDotColor2.value,
+      patternType:   elPatternType.value,
+      pineconeScale: parseFloat(elPineconeScale.value),
+      spiralBOffset: parseInt(elSpiralBOffset.value, 10),
+      centerPacking: parseFloat(elCenterPacking.value),
+      fillDots:      elFillDots.checked,
+      colorSpirals:  elColorSpirals.checked,
+      sizeGradient:  elSizeGradient.value,
+      spiralFamilies: spiralFamilies,
+      fibCW:         fibCW,
+      fibCCW:        fibCCW
+    };
+    const presets = getPresets();
+    presets[name] = config;
+    setPresets(presets);
+    refreshPresetList();
+    elPresetList.value = name;
+  }
+
+  function loadPreset(name) {
+    if (!name) return;
+    const presets = getPresets();
+    const c = presets[name];
+    if (!c) return;
+
+    elCanvasWidth.value  = c.canvasWidth;
+    elCanvasHeight.value = c.canvasHeight;
+    elNumDots.value      = c.numDots;
+    elSpacing.value      = c.spacing;
+    elRadialPower.value  = c.radialPower;
+    elDotSize.value      = c.dotSize;
+    elDotSizeMin.value   = c.dotSizeMin ?? DEFAULTS.dotSizeMin;
+    elDotOpacity.value   = c.dotOpacity;
+    elStartAngle.value   = c.startAngle;
+    elGoldenAngle.value  = c.goldenAngle;
+    elShowGrid.checked   = c.showGrid;
+    elShowMajorGrid.checked = c.showMajorGrid;
+    elShowAxes.checked   = c.showAxes;
+    elShowLabels.checked = c.showLabels;
+    elDotColor.value     = c.dotColor;
+    elDotColor2.value    = c.dotColor2;
+    elPatternType.value  = c.patternType;
+    elPineconeScale.value = c.pineconeScale;
+    elSpiralBOffset.value = c.spiralBOffset;
+    elCenterPacking.value = c.centerPacking;
+    elFillDots.checked   = c.fillDots;
+    elColorSpirals.checked = c.colorSpirals;
+    elSizeGradient.value = c.sizeGradient ?? DEFAULTS.sizeGradient;
+    spiralFamilies = c.spiralFamilies ?? 21;
+    fibCW  = c.fibCW ?? 21;
+    fibCCW = c.fibCCW ?? 34;
+
+    // Update UI visibility for the loaded pattern type
+    const isDouble = c.patternType === 'double-spiral';
+    document.querySelector('label[for="dotColor"]').textContent = isDouble ? 'Spiral A Color' : 'Dot Color';
+    elDotColor2Row.style.display     = isDouble ? 'flex' : 'none';
+    elSpiralBOffsetRow.style.display = isDouble ? 'block' : 'none';
+    elFibPairRow.style.display       = isDouble ? 'block' : 'none';
+    elPineconeScaleRow.style.display = c.patternType === 'pinecone' ? 'block' : 'none';
+    elSpiralCountRow.style.display   = (!isDouble && c.colorSpirals) ? 'block' : 'none';
+
+    // Highlight active spiral/fib buttons
+    document.querySelectorAll('.spiral-preset').forEach(b => {
+      b.classList.toggle('active', parseInt(b.dataset.val, 10) === spiralFamilies);
+    });
+    document.querySelectorAll('.fib-pair').forEach(b => {
+      b.classList.toggle('active', parseInt(b.dataset.cw, 10) === fibCW);
+    });
+
+    updateSliderDisplays();
+    applyCanvasSize();
+    draw();
+  }
+
+  function deletePreset(name) {
+    if (!name) return;
+    const presets = getPresets();
+    delete presets[name];
+    setPresets(presets);
+    refreshPresetList();
   }
 
   // ─── Slider Value Display Updater ─────────────────────
@@ -541,12 +767,13 @@
     elPineconeScaleValue.value = parseFloat(elPineconeScale.value).toFixed(2);
     elSpiralBOffsetValue.value = elSpiralBOffset.value;
     elCenterPackingValue.value = parseFloat(elCenterPacking.value).toFixed(1);
+    elDotSizeMinValue.value = parseFloat(elDotSizeMin.value).toFixed(1);
   }
 
   // ─── Event Wiring ────────────────────────────────────
 
   // Sliders drive live redraws
-  [elNumDots, elSpacing, elDotSize, elRadialPower, elDotOpacity, elStartAngle, elPineconeScale, elSpiralBOffset, elCenterPacking].forEach(slider => {
+  [elNumDots, elSpacing, elDotSize, elDotSizeMin, elRadialPower, elDotOpacity, elStartAngle, elPineconeScale, elSpiralBOffset, elCenterPacking].forEach(slider => {
     slider.addEventListener('input', () => {
       updateSliderDisplays();
       draw();
@@ -554,9 +781,10 @@
   });
 
   // Display toggles
-  [elShowGrid, elShowMajorGrid, elShowAxes, elShowLabels, elFillDots, elGradientSize].forEach(cb => {
+  [elShowGrid, elShowMajorGrid, elShowAxes, elShowLabels, elFillDots].forEach(cb => {
     cb.addEventListener('change', draw);
   });
+  elSizeGradient.addEventListener('change', draw);
 
   // Number input fields sync back to sliders
   const sliderInputPairs = [
@@ -568,7 +796,8 @@
     [elStartAngle, elStartAngleValue],
     [elPineconeScale, elPineconeScaleValue],
     [elSpiralBOffset, elSpiralBOffsetValue],
-    [elCenterPacking, elCenterPackingValue]
+    [elCenterPacking, elCenterPackingValue],
+    [elDotSizeMin, elDotSizeMinValue]
   ];
   sliderInputPairs.forEach(([slider, numInput]) => {
     numInput.addEventListener('input', () => {
@@ -640,6 +869,20 @@
   elAutoFit.addEventListener('click', autoFit);
   elExportPNG.addEventListener('click', exportPNG);
   elExportSVG.addEventListener('click', exportSVG);
+  elExportDXF.addEventListener('click', exportDXF);
+
+  // Preset buttons
+  elPresetSave.addEventListener('click', () => {
+    const name = elPresetName.value.trim();
+    if (!name) { elPresetName.focus(); return; }
+    savePreset(name);
+    elPresetName.value = '';
+  });
+  elPresetLoad.addEventListener('click', () => loadPreset(elPresetList.value));
+  elPresetDelete.addEventListener('click', () => {
+    const name = elPresetList.value;
+    if (name && confirm(`Delete preset "${name}"?`)) deletePreset(name);
+  });
 
   // Snap golden angle slider near the true golden angle
   elGoldenAngle.addEventListener('input', () => {
@@ -681,7 +924,8 @@
     elCenterPacking.value  = DEFAULTS.centerPacking;
     elFillDots.checked   = DEFAULTS.fillDots;
     elColorSpirals.checked = DEFAULTS.colorSpirals;
-    elGradientSize.checked = DEFAULTS.gradientSize;
+    elDotSizeMin.value      = DEFAULTS.dotSizeMin;
+    elSizeGradient.value   = DEFAULTS.sizeGradient;
     // Reset visibility — defaults to sunflower, spirals not highlighted
     document.querySelector('label[for=\"dotColor\"]').textContent = 'Dot Color';
     elSpiralCountRow.style.display   = 'none';
@@ -710,6 +954,7 @@
 
   // ─── Initialise ──────────────────────────────────────
 
+  refreshPresetList();
   applyCanvasSize();
   // Auto-fit on first load so pattern fills the canvas
   autoFit();

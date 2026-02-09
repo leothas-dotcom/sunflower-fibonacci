@@ -327,6 +327,62 @@ body {
 }
 
 /* ===== Canvas Area ===== */
+
+/* ===== Presets ===== */
+.preset-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.preset-name-input {
+  flex: 1;
+  padding: 4px 8px;
+  background: #0d1b36;
+  border: 1px solid #3a3a6a;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 0.82rem;
+}
+
+.preset-name-input:focus {
+  border-color: #e0ca3c;
+  outline: none;
+}
+
+.preset-select {
+  flex: 1;
+  padding: 4px 8px;
+  background: #0d1b36;
+  border: 1px solid #3a3a6a;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.preset-select:focus {
+  border-color: #e0ca3c;
+  outline: none;
+}
+
+.btn-small-inline {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.btn-danger {
+  background: #3a1a1a;
+  border-color: #7a3a3a;
+}
+
+.btn-danger:hover {
+  background: #5a2a2a;
+  border-color: #e04040;
+}
+
+/* ===== Canvas Area (continued) ===== */
 .canvas-area {
   flex: 1;
   display: flex;
@@ -359,4 +415,87 @@ body {
 
 .controls-panel::-webkit-scrollbar-thumb:hover {
   background: #5a5a9a;
+}
+
+/* ===== Responsive: Tablet & Mobile ===== */
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  body {
+    overflow: auto;
+    height: auto;
+  }
+
+  .controls-panel {
+    width: 100%;
+    min-width: unset;
+    max-height: 45vh;
+    border-right: none;
+    border-bottom: 2px solid #0f3460;
+    padding: 12px;
+  }
+
+  .controls-panel h1 {
+    font-size: 1.2rem;
+  }
+
+  .canvas-area {
+    min-height: 55vh;
+    padding: 10px;
+  }
+
+  #sunflowerCanvas {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .export-buttons {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .controls-panel {
+    padding: 8px;
+    max-height: 40vh;
+  }
+
+  .control-group {
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+
+  .control-group h2 {
+    font-size: 0.78rem;
+  }
+
+  .slider-row label,
+  .input-row label,
+  .checkbox-row label {
+    font-size: 0.75rem;
+  }
+
+  .btn {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+  }
+
+  .export-buttons {
+    flex-direction: column;
+  }
+
+  .export-buttons .btn {
+    flex: unset;
+    width: 100%;
+  }
+
+  .value-input {
+    width: 52px;
+    min-width: 44px;
+    font-size: 0.75rem;
+  }
 }

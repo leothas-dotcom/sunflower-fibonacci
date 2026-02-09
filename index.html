@@ -75,10 +75,18 @@
         </div>
 
         <div class="slider-row">
-          <label for="dotSize">Dot Size (mm)</label>
+          <label for="dotSize">Dot Max Size (mm)</label>
           <div class="slider-with-value">
             <input type="range" id="dotSize" min="0.2" max="5" value="1.0" step="0.1">
             <input type="number" id="dotSizeValue" class="value-input" value="1.0" min="0.2" max="5" step="0.1">
+          </div>
+        </div>
+
+        <div class="slider-row">
+          <label for="dotSizeMin">Dot Min Size (mm)</label>
+          <div class="slider-with-value">
+            <input type="range" id="dotSizeMin" min="0" max="5" value="0.2" step="0.1">
+            <input type="number" id="dotSizeMinValue" class="value-input" value="0.2" min="0" max="5" step="0.1">
           </div>
         </div>
 
@@ -183,9 +191,30 @@
           </div>
           <span class="hint">0 = uniform, 1 = tiny center &rarr; full edge</span>
         </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="gradientSize">
-          <label for="gradientSize">Size gradient (inner &rarr; outer)</label>
+        <div class="slider-row">
+          <label for="sizeGradient">Size Gradient</label>
+          <select id="sizeGradient">
+            <option value="none">None</option>
+            <option value="inner-outer">Inner &rarr; Outer</option>
+            <option value="outer-inner">Outer &rarr; Inner</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="control-group">
+        <h2>Presets</h2>
+        <div class="preset-row">
+          <input type="text" id="presetName" class="preset-name-input" placeholder="Preset name…">
+          <button id="presetSave" class="btn btn-small-inline">Save</button>
+        </div>
+        <div class="preset-row" style="margin-top:6px;">
+          <select id="presetList" class="preset-select">
+            <option value="">— Select preset —</option>
+          </select>
+        </div>
+        <div class="preset-row" style="margin-top:4px;">
+          <button id="presetLoad" class="btn btn-small-inline">Load</button>
+          <button id="presetDelete" class="btn btn-small-inline btn-danger">Delete</button>
         </div>
       </section>
 
@@ -194,6 +223,7 @@
         <div class="export-buttons">
           <button id="exportPNG" class="btn">Export PNG</button>
           <button id="exportSVG" class="btn">Export SVG</button>
+          <button id="exportDXF" class="btn">Export DXF</button>
         </div>
       </section>
 
