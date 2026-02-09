@@ -93,6 +93,26 @@
   const elColorSpirals = document.getElementById('colorSpirals');
   const elSpiralCountRow = document.getElementById('spiralCountRow');
   const elSizeGradient = document.getElementById('sizeGradient');
+  const elShapeMargin     = document.getElementById('edgeMargin');
+  const elShapeMarginValue = document.getElementById('edgeMarginValue');
+  const elShapeMarginRow  = document.getElementById('edgeMarginRow');
+  const elShapeFillMode   = document.getElementById('shapeFillMode');
+  const elShapeFillModeRow = document.getElementById('shapeFillModeRow');
+  const elHoleSizeMode    = document.getElementById('holeSizeMode');
+  const elHoleSizeModeRow = document.getElementById('holeSizeModeRow');
+  const elShapeSize       = document.getElementById('shapeSize');
+  const elShapeSizeValue  = document.getElementById('shapeSizeValue');
+  const elShapeSizeRow    = document.getElementById('shapeSizeRow');
+  const elSpacingRow      = document.getElementById('spacingRow');
+  const elRadialPowerRow  = document.getElementById('radialPowerRow');
+  const elCenterPackingRow = document.getElementById('centerPackingRow');
+  const elDotSizeRow      = document.getElementById('dotSizeRow');
+  const elDotSizeMinRow   = document.getElementById('dotSizeMinRow');
+  const elDotOpacityRow   = document.getElementById('dotOpacityRow');
+  const elGoldenAngleRow  = document.getElementById('goldenAngleRow');
+  const elStartAngleRow   = document.getElementById('startAngleRow');
+  const elColorSpiralsRow = document.getElementById('colorSpiralsRow');
+  const elSizeGradientRow = document.getElementById('sizeGradientRow');
   const elGoldenAngle  = document.getElementById('goldenAngle');
   const elGoldenAngleValue = document.getElementById('goldenAngleValue');
   const elSnapGoldenAngle = document.getElementById('snapGoldenAngle');
@@ -121,7 +141,7 @@
   const DEFAULTS = {
     canvasWidth: 100,
     canvasHeight: 100,
-    numDots: 500,
+    numDots: 50,
     spacing: 2.2,
     radialPower: 0.5,
     dotSize: 1.0,
@@ -137,11 +157,15 @@
     dotColor2: '#4363d8',
     patternType: 'sunflower',
     pineconeScale: 0.7,
-    spiralBOffset: 0,
+    spiralBOffset: 180,
     centerPacking: 0,
     fillDots: true,
     colorSpirals: false,
-    sizeGradient: 'none'
+    sizeGradient: 'none',
+    edgeMargin: 2,
+    shapeFillMode: 'outline',
+    holeSizeMode: 'fibonacci',
+    shapeSize: 90
   };
 
   // Snap threshold for golden angle (degrees)
@@ -158,6 +182,298 @@
 
   function mmToPx(mm) {
     return mm * PX_PER_MM;
+  }
+
+  /** Zeckendorf-like decomposition: express n as sum of Fibonacci numbers */
+  function fibDecompose(n) {
+    const fibs = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181];
+    const groups = [];
+    let remaining = n;
+    for (let i = fibs.length - 1; i >= 0 && remaining > 0; i--) {
+      if (fibs[i] <= remaining) {
+        groups.push(fibs[i]);
+        remaining -= fibs[i];
+      }
+    }
+    if (remaining > 0) groups.push(remaining);
+    return groups.sort((a, b) => a - b); // smallest first
+  }
+
+  /** Seeded pseudo-random for deterministic layout */
+  function seededRandom(seed) {
+    let s = seed;
+    return () => {
+      s = (s * 16807 + 0) % 2147483647;
+      return (s - 1) / 2147483646;
+    };
+  }
+
+  /** Generate dots for basic shapes (circle, rectangle, triangle) */
+  function computeShapeDots() {
+    const n         = parseInt(elNumDots.value, 10);
+    const baseDotMM = parseFloat(elDotSize.value);
+    const minDotMM  = parseFloat(elDotSizeMin.value);
+    const color     = elDotColor.value;
+    const pattern   = elPatternType.value;
+    const margin    = parseFloat(elShapeMargin.value);
+    const fillMode  = elShapeFillMode.value;
+    const holeSizeMode = elHoleSizeMode.value; // 'uniform' or 'fibonacci'
+    const shapeScale = parseFloat(elShapeSize.value) / 100;
+
+    const halfW = widthMM / 2 * shapeScale;
+    const halfH = heightMM / 2 * shapeScale;
+    const dots = [];
+
+    // Build size assignment
+    let sizeForIndex;
+    if (holeSizeMode === 'fibonacci' && n > 1) {
+      const groups = fibDecompose(n);
+      const numGroups = groups.length;
+      const sizeMap = [];
+      for (let g = 0; g < numGroups; g++) {
+        const t = numGroups > 1 ? g / (numGroups - 1) : 0.5;
+        const radius = (minDotMM + (baseDotMM - minDotMM) * t) / 2;
+        for (let j = 0; j < groups[g]; j++) {
+          sizeMap.push(radius);
+        }
+      }
+      // Shuffle deterministically
+      const rand = seededRandom(n * 7 + 13);
+      for (let i = sizeMap.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [sizeMap[i], sizeMap[j]] = [sizeMap[j], sizeMap[i]];
+      }
+      sizeForIndex = (i) => sizeMap[i] || baseDotMM / 2;
+    } else {
+      sizeForIndex = () => baseDotMM / 2;
+    }
+
+    /** Compute equilateral triangle vertices centered by bounding box */
+    function triVerts(R) {
+      const raw = [
+        [R * Math.cos(-Math.PI/2), R * Math.sin(-Math.PI/2)],
+        [R * Math.cos(-Math.PI/2 + 2*Math.PI/3), R * Math.sin(-Math.PI/2 + 2*Math.PI/3)],
+        [R * Math.cos(-Math.PI/2 + 4*Math.PI/3), R * Math.sin(-Math.PI/2 + 4*Math.PI/3)]
+      ];
+      // Bounding-box center shift so triangle is visually centered
+      const ys = raw.map(v => v[1]);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const shiftY = -(minY + maxY) / 2;
+      return raw.map(v => [v[0], v[1] + shiftY]);
+    }
+
+    if (fillMode === 'outline') {
+      if (pattern === 'shape-circle') {
+        const r = Math.min(halfW, halfH) - margin;
+        for (let i = 0; i < n; i++) {
+          const angle = (2 * Math.PI * i) / n;
+          dots.push({
+            xMM: r * Math.cos(angle), yMM: r * Math.sin(angle),
+            radiusMM: sizeForIndex(i), theta: angle, color, strokeColor: null
+          });
+        }
+      } else if (pattern === 'shape-rectangle') {
+        const w = widthMM * shapeScale - 2 * margin;
+        const h = heightMM * shapeScale - 2 * margin;
+        const perimeter = 2 * (w + h);
+        for (let i = 0; i < n; i++) {
+          let d = (perimeter * i) / n;
+          let x, y;
+          if (d < w) {
+            x = -w/2 + d; y = -h/2;
+          } else if (d < w + h) {
+            x = w/2; y = -h/2 + (d - w);
+          } else if (d < 2*w + h) {
+            x = w/2 - (d - w - h); y = h/2;
+          } else {
+            x = -w/2; y = h/2 - (d - 2*w - h);
+          }
+          const angle = Math.atan2(y, x);
+          dots.push({
+            xMM: x, yMM: y, radiusMM: sizeForIndex(i),
+            theta: angle, color, strokeColor: null
+          });
+        }
+      } else if (pattern === 'shape-triangle') {
+        const r = Math.min(halfW, halfH) - margin;
+        const verts = triVerts(r);
+        const edges = [
+          [verts[0], verts[1]], [verts[1], verts[2]], [verts[2], verts[0]]
+        ];
+        const edgeLens = edges.map(([a, b]) =>
+          Math.sqrt((b[0]-a[0])**2 + (b[1]-a[1])**2)
+        );
+        const totalLen = edgeLens.reduce((s, l) => s + l, 0);
+        for (let i = 0; i < n; i++) {
+          let d = (totalLen * i) / n;
+          let x, y;
+          for (let e = 0; e < 3; e++) {
+            if (d <= edgeLens[e] || e === 2) {
+              const t = d / edgeLens[e];
+              const [a, b] = edges[e];
+              x = a[0] + t * (b[0] - a[0]);
+              y = a[1] + t * (b[1] - a[1]);
+              break;
+            }
+            d -= edgeLens[e];
+          }
+          const angle = Math.atan2(y, x);
+          dots.push({
+            xMM: x, yMM: y, radiusMM: sizeForIndex(i),
+            theta: angle, color, strokeColor: null
+          });
+        }
+      }
+    } else {
+      // Filled mode: uniform deterministic distribution
+      if (pattern === 'shape-rectangle') {
+        // Rectangular grid
+        const w = widthMM * shapeScale - 2 * margin;
+        const h = heightMM * shapeScale - 2 * margin;
+        if (n === 1) {
+          dots.push({ xMM: 0, yMM: 0, radiusMM: sizeForIndex(0), theta: 0, color, strokeColor: null });
+        } else {
+          // Find grid dims closest to N while respecting aspect ratio
+          const aspect = w / h;
+          let bestCols = 1, bestRows = 1, bestDiff = Infinity;
+          for (let c = 1; c <= n; c++) {
+            const r = Math.round(c / aspect);
+            if (r < 1) continue;
+            const diff = Math.abs(c * r - n);
+            if (diff < bestDiff || (diff === bestDiff && Math.abs(c/r - aspect) < Math.abs(bestCols/bestRows - aspect))) {
+              bestDiff = diff; bestCols = c; bestRows = r;
+            }
+            if (c * 1 > n) break;
+          }
+          const cols = bestCols, rows = bestRows;
+          const total = cols * rows;
+          let placed = 0;
+          for (let row = 0; row < rows && placed < n; row++) {
+            for (let col = 0; col < cols && placed < n; col++) {
+              const x = cols > 1 ? -w/2 + col * w / (cols - 1) : 0;
+              const y = rows > 1 ? -h/2 + row * h / (rows - 1) : 0;
+              dots.push({
+                xMM: x, yMM: y, radiusMM: sizeForIndex(placed),
+                theta: Math.atan2(y, x), color, strokeColor: null
+              });
+              placed++;
+            }
+          }
+        }
+      } else if (pattern === 'shape-circle') {
+        // Vogel/Fermat spiral (golden angle) — uniform disc packing
+        const r = Math.min(halfW, halfH) - margin;
+        for (let i = 0; i < n; i++) {
+          const frac = n > 1 ? i / (n - 1) : 0;
+          const rDot = r * Math.sqrt(frac);
+          const angle = i * GOLDEN_ANGLE_RAD;
+          dots.push({
+            xMM: rDot * Math.cos(angle), yMM: rDot * Math.sin(angle),
+            radiusMM: sizeForIndex(i), theta: angle, color, strokeColor: null
+          });
+        }
+      } else if (pattern === 'shape-triangle') {
+        // Triangular lattice rows inside the triangle
+        const R = Math.min(halfW, halfH) - margin;
+        const verts = triVerts(R);
+        // v0=top, v1=bottom-right, v2=bottom-left (after centering)
+        const [v0, v1, v2] = verts;
+        const minY = Math.min(v0[1], v1[1], v2[1]);
+        const maxY = Math.max(v0[1], v1[1], v2[1]);
+        const triH = maxY - minY;
+
+        if (n === 1) {
+          const cx = (v0[0] + v1[0] + v2[0]) / 3;
+          const cy = (v0[1] + v1[1] + v2[1]) / 3;
+          dots.push({ xMM: cx, yMM: cy, radiusMM: sizeForIndex(0), theta: 0, color, strokeColor: null });
+        } else {
+          // Iteratively find rowCount that produces ~N dots
+          let bestRows = 1, bestTotal = 1;
+          for (let tryRows = 1; tryRows <= n; tryRows++) {
+            let total = 0;
+            for (let r = 0; r < tryRows; r++) {
+              const y = minY + (tryRows > 1 ? r * triH / (tryRows - 1) : triH / 2);
+              // Find left/right x at this y by intersecting triangle edges
+              const xs = [];
+              const allEdges = [[v0, v1], [v1, v2], [v2, v0]];
+              for (const [ea, eb] of allEdges) {
+                if ((ea[1] <= y && eb[1] >= y) || (eb[1] <= y && ea[1] >= y)) {
+                  const t = (eb[1] === ea[1]) ? 0.5 : (y - ea[1]) / (eb[1] - ea[1]);
+                  xs.push(ea[0] + t * (eb[0] - ea[0]));
+                }
+              }
+              if (xs.length >= 2) {
+                const xMin = Math.min(...xs);
+                const xMax = Math.max(...xs);
+                const rowW = xMax - xMin;
+                const dotsInRow = rowW < 0.01 ? 1 : Math.max(1, Math.round(rowW / (triH / (tryRows - 1 || 1))));
+                total += dotsInRow;
+              } else {
+                total += 1;
+              }
+            }
+            if (Math.abs(total - n) < Math.abs(bestTotal - n)) {
+              bestRows = tryRows; bestTotal = total;
+            }
+            if (total >= n * 1.5) break;
+          }
+          // Now place dots with bestRows
+          const rowCount = bestRows;
+          let placed = 0;
+          // Collect all potential positions first
+          const positions = [];
+          for (let r = 0; r < rowCount; r++) {
+            const y = minY + (rowCount > 1 ? r * triH / (rowCount - 1) : triH / 2);
+            const xs = [];
+            const allEdges = [[v0, v1], [v1, v2], [v2, v0]];
+            for (const [ea, eb] of allEdges) {
+              if ((ea[1] <= y && eb[1] >= y) || (eb[1] <= y && ea[1] >= y)) {
+                const t = (eb[1] === ea[1]) ? 0.5 : (y - ea[1]) / (eb[1] - ea[1]);
+                xs.push(ea[0] + t * (eb[0] - ea[0]));
+              }
+            }
+            if (xs.length >= 2) {
+              const xMin = Math.min(...xs);
+              const xMax = Math.max(...xs);
+              const rowW = xMax - xMin;
+              const rowSpacing = rowCount > 1 ? triH / (rowCount - 1) : triH;
+              const dotsInRow = rowW < 0.01 ? 1 : Math.max(1, Math.round(rowW / rowSpacing));
+              for (let c = 0; c < dotsInRow; c++) {
+                const x = dotsInRow > 1 ? xMin + c * rowW / (dotsInRow - 1) : (xMin + xMax) / 2;
+                positions.push([x, y]);
+              }
+            } else if (xs.length === 1) {
+              positions.push([xs[0], y]);
+            }
+          }
+          // Pick N dots evenly from all positions
+          for (let i = 0; i < n && i < positions.length; i++) {
+            const idx = positions.length > n
+              ? Math.round(i * (positions.length - 1) / (n - 1))
+              : i;
+            const [x, y] = positions[Math.min(idx, positions.length - 1)];
+            dots.push({
+              xMM: x, yMM: y, radiusMM: sizeForIndex(placed),
+              theta: Math.atan2(y, x), color, strokeColor: null
+            });
+            placed++;
+          }
+          // If we need more dots than positions, add extras at centroid
+          const cx = (v0[0] + v1[0] + v2[0]) / 3;
+          const cy = (v0[1] + v1[1] + v2[1]) / 3;
+          while (placed < n) {
+            dots.push({
+              xMM: cx, yMM: cy, radiusMM: sizeForIndex(placed),
+              theta: 0, color, strokeColor: null
+            });
+            placed++;
+          }
+        }
+      }
+    }
+
+    return dots;
   }
 
   /** Compute all dot positions, sizes, and colors for the active pattern */
@@ -228,43 +544,46 @@
 
     if (pattern === 'double-spiral') {
       // Two separate dot sets overlaid, both using golden angle
+      // Split total count between the two spirals
+      const nA = Math.ceil(n / 2);
+      const nB = n - nA;
       const color2 = elDotColor2.value;
       const bOffsetRad = parseFloat(elSpiralBOffset.value) * (Math.PI / 180);
-      // Spiral A: N dots
-      addDots(n, 0, color);
-      // Spiral B: N dots with angular offset
-      addDots(n, bOffsetRad, color2);
+      // Spiral A
+      addDots(nA, 0, color);
+      // Spiral B with angular offset
+      addDots(nB, bOffsetRad, color2);
 
       // Always color by Fibonacci family so the fib pair buttons work
       if (spiralCol) {
         // Highlight: warm palette for Spiral A families, cool palette for Spiral B
-        for (let i = 0; i < n && i < dots.length; i++) {
+        for (let i = 0; i < nA && i < dots.length; i++) {
           dots[i].color = WARM_PALETTE[(i % fibCW) % WARM_PALETTE.length];
         }
-        for (let i = 0; i < n && (i + n) < dots.length; i++) {
-          dots[i + n].color = COOL_PALETTE[(i % fibCCW) % COOL_PALETTE.length];
+        for (let i = 0; i < nB && (i + nA) < dots.length; i++) {
+          dots[i + nA].color = COOL_PALETTE[(i % fibCCW) % COOL_PALETTE.length];
         }
       } else {
         // Default: shade the user's chosen color per family
-        // Generate lighter/darker variants by mixing with white/black
         const shadeColor = (hex, family, totalFamilies) => {
           const r = parseInt(hex.slice(1, 3), 16);
           const g = parseInt(hex.slice(3, 5), 16);
           const b = parseInt(hex.slice(5, 7), 16);
-          // Vary lightness: family 0 = base color, others shift in brightness
           const factor = 0.4 + 0.6 * (family / Math.max(1, totalFamilies - 1));
           const nr = Math.round(Math.min(255, r * factor + (1 - factor) * 40));
           const ng = Math.round(Math.min(255, g * factor + (1 - factor) * 40));
           const nb = Math.round(Math.min(255, b * factor + (1 - factor) * 40));
           return `#${nr.toString(16).padStart(2,'0')}${ng.toString(16).padStart(2,'0')}${nb.toString(16).padStart(2,'0')}`;
         };
-        for (let i = 0; i < n && i < dots.length; i++) {
+        for (let i = 0; i < nA && i < dots.length; i++) {
           dots[i].color = shadeColor(color, i % fibCW, fibCW);
         }
-        for (let i = 0; i < n && (i + n) < dots.length; i++) {
-          dots[i + n].color = shadeColor(color2, i % fibCCW, fibCCW);
+        for (let i = 0; i < nB && (i + nA) < dots.length; i++) {
+          dots[i + nA].color = shadeColor(color2, i % fibCCW, fibCCW);
         }
       }
+    } else if (pattern.startsWith('shape-')) {
+      return computeShapeDots();
     } else {
       addDots(n, 0, color);
     }
@@ -275,8 +594,9 @@
   /** Calculate optimal spacing so pattern fills ~85% of the smaller canvas dimension */
   function calcAutoFitSpacing() {
     const n = parseInt(elNumDots.value, 10);
+    const margin = parseFloat(elShapeMargin.value);
     const halfMin = Math.min(widthMM, heightMM) / 2;
-    const targetRadius = halfMin * 0.85;
+    const targetRadius = (halfMin - margin) * 0.85;
     // rMax = spacing * sqrt(n-1)  →  spacing = targetRadius / sqrt(n-1)
     return targetRadius / Math.sqrt(Math.max(1, n - 1));
   }
@@ -680,6 +1000,10 @@
       fillDots:      elFillDots.checked,
       colorSpirals:  elColorSpirals.checked,
       sizeGradient:  elSizeGradient.value,
+      edgeMargin:    parseFloat(elShapeMargin.value),
+      shapeFillMode: elShapeFillMode.value,
+      holeSizeMode:  elHoleSizeMode.value,
+      shapeSize:     parseInt(elShapeSize.value, 10),
       spiralFamilies: spiralFamilies,
       fibCW:         fibCW,
       fibCCW:        fibCCW
@@ -720,18 +1044,16 @@
     elFillDots.checked   = c.fillDots;
     elColorSpirals.checked = c.colorSpirals;
     elSizeGradient.value = c.sizeGradient ?? DEFAULTS.sizeGradient;
+    elShapeMargin.value   = c.edgeMargin ?? c.shapeMargin ?? DEFAULTS.edgeMargin;
+    elShapeFillMode.value = c.shapeFillMode ?? DEFAULTS.shapeFillMode;
+    elHoleSizeMode.value  = c.holeSizeMode ?? (c.shapeFibSizes === false ? 'uniform' : DEFAULTS.holeSizeMode);
+    elShapeSize.value     = c.shapeSize ?? DEFAULTS.shapeSize;
     spiralFamilies = c.spiralFamilies ?? 21;
     fibCW  = c.fibCW ?? 21;
     fibCCW = c.fibCCW ?? 34;
 
     // Update UI visibility for the loaded pattern type
-    const isDouble = c.patternType === 'double-spiral';
-    document.querySelector('label[for="dotColor"]').textContent = isDouble ? 'Spiral A Color' : 'Dot Color';
-    elDotColor2Row.style.display     = isDouble ? 'flex' : 'none';
-    elSpiralBOffsetRow.style.display = isDouble ? 'block' : 'none';
-    elFibPairRow.style.display       = isDouble ? 'block' : 'none';
-    elPineconeScaleRow.style.display = c.patternType === 'pinecone' ? 'block' : 'none';
-    elSpiralCountRow.style.display   = (!isDouble && c.colorSpirals) ? 'block' : 'none';
+    updateControlVisibility(c.patternType, c.colorSpirals);
 
     // Highlight active spiral/fib buttons
     document.querySelectorAll('.spiral-preset').forEach(b => {
@@ -768,12 +1090,14 @@
     elSpiralBOffsetValue.value = elSpiralBOffset.value;
     elCenterPackingValue.value = parseFloat(elCenterPacking.value).toFixed(1);
     elDotSizeMinValue.value = parseFloat(elDotSizeMin.value).toFixed(1);
+    elShapeMarginValue.value = parseFloat(elShapeMargin.value).toFixed(1);
+    elShapeSizeValue.value = elShapeSize.value;
   }
 
   // ─── Event Wiring ────────────────────────────────────
 
   // Sliders drive live redraws
-  [elNumDots, elSpacing, elDotSize, elDotSizeMin, elRadialPower, elDotOpacity, elStartAngle, elPineconeScale, elSpiralBOffset, elCenterPacking].forEach(slider => {
+  [elNumDots, elSpacing, elDotSize, elDotSizeMin, elRadialPower, elDotOpacity, elStartAngle, elPineconeScale, elSpiralBOffset, elCenterPacking, elShapeMargin, elShapeSize].forEach(slider => {
     slider.addEventListener('input', () => {
       updateSliderDisplays();
       draw();
@@ -785,6 +1109,14 @@
     cb.addEventListener('change', draw);
   });
   elSizeGradient.addEventListener('change', draw);
+  elShapeFillMode.addEventListener('change', draw);
+  elHoleSizeMode.addEventListener('change', () => {
+    const isShape = elPatternType.value.startsWith('shape-');
+    if (isShape) {
+      elDotSizeMinRow.style.display = elHoleSizeMode.value === 'fibonacci' ? 'block' : 'none';
+    }
+    draw();
+  });
 
   // Number input fields sync back to sliders
   const sliderInputPairs = [
@@ -797,7 +1129,9 @@
     [elPineconeScale, elPineconeScaleValue],
     [elSpiralBOffset, elSpiralBOffsetValue],
     [elCenterPacking, elCenterPackingValue],
-    [elDotSizeMin, elDotSizeMinValue]
+    [elDotSizeMin, elDotSizeMinValue],
+    [elShapeMargin, elShapeMarginValue],
+    [elShapeSize, elShapeSizeValue]
   ];
   sliderInputPairs.forEach(([slider, numInput]) => {
     numInput.addEventListener('input', () => {
@@ -811,23 +1145,54 @@
     draw();
   });
 
-  // Pattern type selector
-  elPatternType.addEventListener('change', () => {
-    const pattern = elPatternType.value;
+  // Pattern type selector — toggle control visibility
+  function updateControlVisibility(pattern, colorSpirals) {
     const isDouble = pattern === 'double-spiral';
-    // Update color label
+    const isShape  = pattern.startsWith('shape-');
+    const isSpiral = !isShape; // sunflower, pinecone, double-spiral
+
+    // Spiral-only controls
+    elSpacingRow.style.display       = isSpiral ? 'block' : 'none';
+    elRadialPowerRow.style.display   = isSpiral ? 'block' : 'none';
+    elCenterPackingRow.style.display = isSpiral ? 'block' : 'none';
+    elGoldenAngleRow.style.display   = isSpiral ? 'block' : 'none';
+    elStartAngleRow.style.display    = isSpiral ? 'block' : 'none';
+    elSizeGradientRow.style.display  = isSpiral ? 'block' : 'none';
+    elDotOpacityRow.style.display    = 'block'; // always visible
+    elDotSizeRow.style.display       = 'block'; // always visible
+
+    // Dot min size: spirals always show it; shapes only when fibonacci mode
+    if (isShape) {
+      elDotSizeMinRow.style.display = elHoleSizeMode.value === 'fibonacci' ? 'block' : 'none';
+    } else {
+      elDotSizeMinRow.style.display = 'block';
+    }
+
+    // Double-spiral specific
     document.querySelector('label[for="dotColor"]').textContent = isDouble ? 'Spiral A Color' : 'Dot Color';
-    // Double spiral: show Spiral B color, offset, and fib pair buttons
-    elDotColor2Row.style.display = isDouble ? 'flex' : 'none';
-    elSpiralBOffsetRow.style.display = isDouble ? 'block' : 'none';
-    elFibPairRow.style.display = isDouble ? 'block' : 'none';
-    elPineconeScaleRow.style.display = pattern === 'pinecone' ? 'block' : 'none';
-    // Single-spiral family presets only for non-double modes
-    if (isDouble) {
+    elDotColor2Row.style.display       = isDouble ? 'flex' : 'none';
+    elSpiralBOffsetRow.style.display   = isDouble ? 'block' : 'none';
+    elFibPairRow.style.display         = isDouble ? 'block' : 'none';
+
+    // Pinecone specific
+    elPineconeScaleRow.style.display   = pattern === 'pinecone' ? 'block' : 'none';
+
+    // Shape-specific controls
+    elShapeSizeRow.style.display       = isShape ? 'block' : 'none';
+    elShapeFillModeRow.style.display   = isShape ? 'block' : 'none';
+    elHoleSizeModeRow.style.display    = isShape ? 'block' : 'none';
+
+    // Color spirals & family presets — only for non-double spiral modes
+    elColorSpiralsRow.style.display    = (isSpiral && !isDouble) ? 'flex' : 'none';
+    if (isDouble || isShape) {
       elSpiralCountRow.style.display = 'none';
     } else {
-      elSpiralCountRow.style.display = elColorSpirals.checked ? 'block' : 'none';
+      elSpiralCountRow.style.display = colorSpirals ? 'block' : 'none';
     }
+  }
+
+  elPatternType.addEventListener('change', () => {
+    updateControlVisibility(elPatternType.value, elColorSpirals.checked);
     draw();
   });
 
@@ -844,13 +1209,8 @@
     });
   });
 
-  // Spiral highlighting toggle
   elColorSpirals.addEventListener('change', () => {
-    const pattern = elPatternType.value;
-    const isDouble = pattern === 'double-spiral';
-    if (!isDouble) {
-      elSpiralCountRow.style.display = elColorSpirals.checked ? 'block' : 'none';
-    }
+    updateControlVisibility(elPatternType.value, elColorSpirals.checked);
     draw();
   });
 
@@ -926,8 +1286,13 @@
     elColorSpirals.checked = DEFAULTS.colorSpirals;
     elDotSizeMin.value      = DEFAULTS.dotSizeMin;
     elSizeGradient.value   = DEFAULTS.sizeGradient;
+    elShapeMargin.value    = DEFAULTS.edgeMargin;
+    elShapeFillMode.value  = DEFAULTS.shapeFillMode;
+    elHoleSizeMode.value   = DEFAULTS.holeSizeMode;
+    elShapeSize.value      = DEFAULTS.shapeSize;
     // Reset visibility — defaults to sunflower, spirals not highlighted
     document.querySelector('label[for=\"dotColor\"]').textContent = 'Dot Color';
+    updateControlVisibility(DEFAULTS.patternType, DEFAULTS.colorSpirals);
     elSpiralCountRow.style.display   = 'none';
     elDotColor2Row.style.display     = 'none';
     elSpiralBOffsetRow.style.display = 'none';
@@ -955,6 +1320,7 @@
   // ─── Initialise ──────────────────────────────────────
 
   refreshPresetList();
+  updateControlVisibility(elPatternType.value, elColorSpirals.checked);
   applyCanvasSize();
   // Auto-fit on first load so pattern fills the canvas
   autoFit();

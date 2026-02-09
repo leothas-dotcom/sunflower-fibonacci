@@ -37,18 +37,53 @@
             <option value="sunflower" selected>&#x1F33B; Sunflower</option>
             <option value="pinecone">&#x1F33E; Pinecone</option>
             <option value="double-spiral">&#x1F300; Double Spiral</option>
+            <option value="shape-circle">&#x2B55; Circle</option>
+            <option value="shape-rectangle">&#x1F532; Rectangle</option>
+            <option value="shape-triangle">&#x1F53A; Triangle</option>
           </select>
         </div>
 
         <div class="slider-row">
           <label for="numDots">Number of Dots</label>
           <div class="slider-with-value">
-            <input type="range" id="numDots" min="1" max="5000" value="500" step="1">
-            <input type="number" id="numDotsValue" class="value-input" value="500" min="1" max="5000" step="1">
+            <input type="range" id="numDots" min="1" max="5000" value="50" step="1">
+            <input type="number" id="numDotsValue" class="value-input" value="50" min="1" max="5000" step="1">
           </div>
         </div>
 
-        <div class="slider-row">
+        <div class="slider-row" id="edgeMarginRow">
+          <label for="edgeMargin">Edge Margin (mm)</label>
+          <div class="slider-with-value">
+            <input type="range" id="edgeMargin" min="0" max="20" value="2" step="0.5">
+            <input type="number" id="edgeMarginValue" class="value-input" value="2.0" min="0" max="20" step="0.5">
+          </div>
+        </div>
+
+        <div class="slider-row" id="shapeSizeRow" style="display:none;">
+          <label for="shapeSize">Shape Size (%)</label>
+          <div class="slider-with-value">
+            <input type="range" id="shapeSize" min="1" max="100" value="90" step="1">
+            <input type="number" id="shapeSizeValue" class="value-input" value="90" min="1" max="100" step="1">
+          </div>
+        </div>
+
+        <div class="slider-row" id="shapeFillModeRow" style="display:none;">
+          <label for="shapeFillMode">Hole Distribution</label>
+          <select id="shapeFillMode">
+            <option value="outline">Outline only</option>
+            <option value="filled">Filled</option>
+          </select>
+        </div>
+
+        <div class="slider-row" id="holeSizeModeRow" style="display:none;">
+          <label for="holeSizeMode">Hole Size Mode</label>
+          <select id="holeSizeMode">
+            <option value="uniform">Uniform</option>
+            <option value="fibonacci" selected>Fibonacci Groups</option>
+          </select>
+        </div>
+
+        <div class="slider-row" id="spacingRow">
           <label for="spacing">Spacing Factor (mm)</label>
           <div class="slider-with-value">
             <input type="range" id="spacing" min="0.1" max="15" value="2.2" step="0.1">
@@ -56,7 +91,7 @@
           </div>
         </div>
 
-        <div class="slider-row">
+        <div class="slider-row" id="radialPowerRow">
           <label for="radialPower">Radial Power (n<sup>x</sup>)</label>
           <div class="slider-with-value">
             <input type="range" id="radialPower" min="0.1" max="1.5" value="0.5" step="0.01">
@@ -65,7 +100,7 @@
           <span class=\"hint\">0.5 = uniform area per dot, &lt;0.5 sparse center, &gt;0.5 dense center</span>
         </div>
 
-        <div class="slider-row">
+        <div class="slider-row" id="centerPackingRow">
           <label for="centerPacking">Center Packing</label>
           <div class="slider-with-value">
             <input type="range" id="centerPacking" min="0" max="3" value="0" step="0.1">
@@ -74,15 +109,15 @@
           <span class="hint">0 = uniform, higher = denser center</span>
         </div>
 
-        <div class="slider-row">
-          <label for="dotSize">Dot Max Size (mm)</label>
+        <div class="slider-row" id="dotSizeRow">
+          <label for="dotSize">Dot Size (mm)</label>
           <div class="slider-with-value">
             <input type="range" id="dotSize" min="0.2" max="5" value="1.0" step="0.1">
             <input type="number" id="dotSizeValue" class="value-input" value="1.0" min="0.2" max="5" step="0.1">
           </div>
         </div>
 
-        <div class="slider-row">
+        <div class="slider-row" id="dotSizeMinRow">
           <label for="dotSizeMin">Dot Min Size (mm)</label>
           <div class="slider-with-value">
             <input type="range" id="dotSizeMin" min="0" max="5" value="0.2" step="0.1">
@@ -90,7 +125,7 @@
           </div>
         </div>
 
-        <div class="slider-row">
+        <div class="slider-row" id="dotOpacityRow">
           <label for="dotOpacity">Dot Opacity</label>
           <div class="slider-with-value">
             <input type="range" id="dotOpacity" min="0.05" max="1" value="1" step="0.05">
@@ -98,7 +133,7 @@
           </div>
         </div>
 
-        <div class="slider-row">
+        <div class="slider-row" id="goldenAngleRow">
           <label for="goldenAngle">Golden Angle (&deg;)</label>
           <div class="slider-with-value">
             <input type="range" id="goldenAngle" min="100" max="180" value="137.508" step="0.001">
@@ -107,7 +142,7 @@
           <button id="snapGoldenAngle" class="btn btn-small" title="Snap to true golden angle">&#x1F33B; 137.508&deg;</button>
         </div>
 
-        <div class="slider-row">
+        <div class="slider-row" id="startAngleRow">
           <label for="startAngle">Start Angle Offset (&deg;)</label>
           <div class="slider-with-value">
             <input type="range" id="startAngle" min="0" max="360" value="0" step="1">
@@ -155,8 +190,8 @@
         <div class="slider-row" id="spiralBOffsetRow" style="display:none;">
           <label for="spiralBOffset">Spiral B Offset (&deg;)</label>
           <div class="slider-with-value">
-            <input type="range" id="spiralBOffset" min="0" max="360" value="0" step="1">
-            <input type="number" id="spiralBOffsetValue" class="value-input" value="0" min="0" max="360" step="1">
+            <input type="range" id="spiralBOffset" min="0" max="360" value="180" step="1">
+            <input type="number" id="spiralBOffsetValue" class="value-input" value="180" min="0" max="360" step="1">
           </div>
         </div>
         <div class="slider-row" id="fibPairRow" style="display:none;">
@@ -169,7 +204,7 @@
           </div>
           <span class="hint">Successive Fibonacci numbers</span>
         </div>
-        <div class="checkbox-row">
+        <div class="checkbox-row" id="colorSpiralsRow">
           <input type="checkbox" id="colorSpirals">
           <label for="colorSpirals">Highlight spiral arms</label>
         </div>
@@ -191,7 +226,7 @@
           </div>
           <span class="hint">0 = uniform, 1 = tiny center &rarr; full edge</span>
         </div>
-        <div class="slider-row">
+        <div class="slider-row" id="sizeGradientRow">
           <label for="sizeGradient">Size Gradient</label>
           <select id="sizeGradient">
             <option value="none">None</option>
