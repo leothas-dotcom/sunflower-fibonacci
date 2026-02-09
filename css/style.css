@@ -164,6 +164,32 @@ body {
   font-family: 'Consolas', 'Courier New', monospace;
 }
 
+.value-input {
+  width: 64px;
+  min-width: 54px;
+  padding: 2px 4px;
+  background: #0d1b36;
+  border: 1px solid #3a3a6a;
+  border-radius: 4px;
+  color: #e0ca3c;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: 'Consolas', 'Courier New', monospace;
+  text-align: right;
+  -moz-appearance: textfield;
+}
+
+.value-input:focus {
+  border-color: #e0ca3c;
+  outline: none;
+}
+
+.value-input::-webkit-inner-spin-button,
+.value-input::-webkit-outer-spin-button {
+  opacity: 1;
+  height: 20px;
+}
+
 /* ===== Checkboxes ===== */
 .checkbox-row {
   display: flex;

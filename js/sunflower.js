@@ -30,6 +30,36 @@
     '#00bfa5', '#aa00ff', '#6200ea', '#ffd600', '#c51162'
   ];
 
+  // Warm palette (reds/oranges/yellows) for CW spiral families
+  const WARM_PALETTE = [
+    '#e6194b', '#ff4444', '#f58231', '#ff6d00', '#e91e63',
+    '#d32f2f', '#ff5722', '#ff9800', '#f44336', '#e65100',
+    '#c62828', '#ff7043', '#ff8a65', '#ef5350', '#d84315',
+    '#bf360c', '#e53935', '#ff5252', '#ff6e40', '#dd2c00',
+    '#b71c1c', '#ff1744', '#ff3d00', '#ff9100', '#ffab00',
+    '#e64a19', '#f4511e', '#ff8f00', '#ff6f00', '#e57373',
+    '#ffab91', '#ffccbc', '#ff8a80', '#ea80fc', '#ce93d8',
+    '#f48fb1', '#ef9a9a', '#ffcdd2', '#d50000', '#c51162',
+    '#ff80ab', '#ff4081', '#f50057', '#ff1744', '#d81b60',
+    '#ad1457', '#880e4f', '#e91e63', '#f06292', '#ec407a',
+    '#ff5252', '#ff1744', '#d50000', '#c62828', '#b71c1c'
+  ];
+
+  // Cool palette (blues/greens/purples) for CCW spiral families
+  const COOL_PALETTE = [
+    '#4363d8', '#2196f3', '#00bcd4', '#009688', '#3f51b5',
+    '#1565c0', '#0288d1', '#00acc1', '#00897b', '#303f9f',
+    '#0d47a1', '#01579b', '#006064', '#004d40', '#1a237e',
+    '#1976d2', '#0097a7', '#00796b', '#283593', '#0277bd',
+    '#00838f', '#00695c', '#1b5e20', '#2e7d32', '#388e3c',
+    '#43a047', '#4caf50', '#66bb6a', '#81c784', '#a5d6a7',
+    '#00e5ff', '#00b0ff', '#2979ff', '#304ffe', '#651fff',
+    '#6200ea', '#aa00ff', '#d500f9', '#536dfe', '#448aff',
+    '#40c4ff', '#18ffff', '#64ffda', '#69f0ae', '#b2ff59',
+    '#00bfa5', '#00b8d4', '#0091ea', '#2962ff', '#6200ea',
+    '#304ffe', '#2979ff', '#448aff', '#00b0ff', '#0091ea'
+  ];
+
   // ─── DOM Elements ─────────────────────────────────────
   const canvas = document.getElementById('sunflowerCanvas');
   const ctx = canvas.getContext('2d');
@@ -46,6 +76,8 @@
   const elDotSizeValue = document.getElementById('dotSizeValue');
   const elRadialPower  = document.getElementById('radialPower');
   const elRadialPowerValue = document.getElementById('radialPowerValue');
+  const elCenterPacking = document.getElementById('centerPacking');
+  const elCenterPackingValue = document.getElementById('centerPackingValue');
   const elDotOpacity   = document.getElementById('dotOpacity');
   const elDotOpacityValue = document.getElementById('dotOpacityValue');
   const elStartAngle   = document.getElementById('startAngle');
@@ -79,9 +111,9 @@
 
   // ─── Defaults ─────────────────────────────────────────
   const DEFAULTS = {
-    canvasWidth: 200,
-    canvasHeight: 200,
-    numDots: 1500,
+    canvasWidth: 100,
+    canvasHeight: 100,
+    numDots: 500,
     spacing: 2.2,
     radialPower: 0.5,
     dotSize: 1.0,
@@ -97,6 +129,7 @@
     patternType: 'sunflower',
     pineconeScale: 0.7,
     spiralBOffset: 0,
+    centerPacking: 0,
     fillDots: true,
     colorSpirals: false,
     gradientSize: false
@@ -123,6 +156,7 @@
     const n         = parseInt(elNumDots.value, 10);
     const spacingMM = parseFloat(elSpacing.value);
     const power     = parseFloat(elRadialPower.value);
+    const packing   = parseFloat(elCenterPacking.value);
     const baseDotMM = parseFloat(elDotSize.value);
     const color     = elDotColor.value;
     const spiralCol = elColorSpirals.checked;
@@ -132,37 +166,37 @@
     const angleDeg  = parseFloat(elGoldenAngle.value);
     const angleRad  = angleDeg * (Math.PI / 180);
     const offsetRad = parseFloat(elStartAngle.value) * (Math.PI / 180);
-    const rMax      = spacingMM * Math.pow(Math.max(1, n - 1), power);
+    // Max radius uses sqrt (Fermat) regardless of power, so power only controls density
+    const rMax      = spacingMM * Math.sqrt(Math.max(1, n - 1));
 
     const dots = [];
 
-    const addDots = (count, extraOffset, baseColor, reverseAngle) => {
-      const sign = reverseAngle ? -1 : 1;
-      // For double spiral, color by the appropriate Fibonacci family count
-      const armCount = (pattern === 'double-spiral')
-        ? (reverseAngle ? fibCCW : fibCW)
-        : spiralFamilies;
+    const addDots = (count, extraOffset, baseColor) => {
       for (let i = 0; i < count; i++) {
-        const rMM   = spacingMM * Math.pow(i, power);
-        const theta = i * angleRad * sign + offsetRad + extraOffset;
+        // Normalized radial position:
+        // t = i/(n-1) in [0,1], then packing remaps density, power shapes the curve.
+        // Max radius stays constant regardless of power or packing.
+        const t = count > 1 ? i / (count - 1) : 0;
+        const packed = Math.pow(t, 1 + packing);  // packing=0: linear, >0: center-heavy
+        const rMM   = rMax * Math.pow(packed, power);
+        const theta = i * angleRad + offsetRad + extraOffset;
 
         // Dot radius
         let dotRadMM = baseDotMM / 2;
         if (pattern === 'pinecone' && gradSize) {
           // Pinecone + gradient: smallest at center, largest at edge
-          const t = count > 1 ? i / (count - 1) : 0;
           const scale = parseFloat(elPineconeScale.value);
           dotRadMM *= (1 - scale) + scale * t;
         } else if (gradSize && rMax > 0) {
-          const t = rMM / rMax;
-          dotRadMM *= (0.3 + 0.7 * t);
+          dotRadMM *= (0.3 + 0.7 * (rMM / rMax));
         }
 
         // Color
-        let dotColor = baseColor;
-        if (spiralCol) {
-          const family = i % armCount;
-          dotColor = SPIRAL_PALETTE[family % SPIRAL_PALETTE.length];
+        let dotFill = baseColor;
+        let dotStroke = null;  // null = no separate outline
+        if (spiralCol && pattern !== 'double-spiral') {
+          const family = i % spiralFamilies;
+          dotFill = SPIRAL_PALETTE[family % SPIRAL_PALETTE.length];
         }
 
         dots.push({
@@ -170,21 +204,53 @@
           yMM: rMM * Math.sin(theta),
           radiusMM: dotRadMM,
           theta: theta,
-          color: dotColor
+          color: dotFill,
+          strokeColor: dotStroke
         });
       }
     };
 
     if (pattern === 'double-spiral') {
-      // Two separate spirals: CW (positive angle) and CCW (negative angle)
+      // Two separate dot sets overlaid, both using golden angle
       const color2 = elDotColor2.value;
       const bOffsetRad = parseFloat(elSpiralBOffset.value) * (Math.PI / 180);
-      // Spiral A: fibCW arms, clockwise
-      addDots(n, 0, color, false);
-      // Spiral B: fibCCW arms, counter-clockwise, with independent offset
-      addDots(n, bOffsetRad, color2, true);
+      // Spiral A: N dots
+      addDots(n, 0, color);
+      // Spiral B: N dots with angular offset
+      addDots(n, bOffsetRad, color2);
+
+      // Always color by Fibonacci family so the fib pair buttons work
+      if (spiralCol) {
+        // Highlight: warm palette for Spiral A families, cool palette for Spiral B
+        for (let i = 0; i < n && i < dots.length; i++) {
+          dots[i].color = WARM_PALETTE[(i % fibCW) % WARM_PALETTE.length];
+        }
+        for (let i = 0; i < n && (i + n) < dots.length; i++) {
+          dots[i + n].color = COOL_PALETTE[(i % fibCCW) % COOL_PALETTE.length];
+        }
+      } else {
+        // Default: shade the user's chosen color per family
+        // Generate lighter/darker variants by mixing with white/black
+        const shadeColor = (hex, family, totalFamilies) => {
+          const r = parseInt(hex.slice(1, 3), 16);
+          const g = parseInt(hex.slice(3, 5), 16);
+          const b = parseInt(hex.slice(5, 7), 16);
+          // Vary lightness: family 0 = base color, others shift in brightness
+          const factor = 0.4 + 0.6 * (family / Math.max(1, totalFamilies - 1));
+          const nr = Math.round(Math.min(255, r * factor + (1 - factor) * 40));
+          const ng = Math.round(Math.min(255, g * factor + (1 - factor) * 40));
+          const nb = Math.round(Math.min(255, b * factor + (1 - factor) * 40));
+          return `#${nr.toString(16).padStart(2,'0')}${ng.toString(16).padStart(2,'0')}${nb.toString(16).padStart(2,'0')}`;
+        };
+        for (let i = 0; i < n && i < dots.length; i++) {
+          dots[i].color = shadeColor(color, i % fibCW, fibCW);
+        }
+        for (let i = 0; i < n && (i + n) < dots.length; i++) {
+          dots[i + n].color = shadeColor(color2, i % fibCCW, fibCCW);
+        }
+      }
     } else {
-      addDots(n, 0, color, false);
+      addDots(n, 0, color);
     }
 
     return dots;
@@ -193,11 +259,10 @@
   /** Calculate optimal spacing so pattern fills ~85% of the smaller canvas dimension */
   function calcAutoFitSpacing() {
     const n = parseInt(elNumDots.value, 10);
-    const power = parseFloat(elRadialPower.value);
     const halfMin = Math.min(widthMM, heightMM) / 2;
     const targetRadius = halfMin * 0.85;
-    // r_max = spacing * (n-1)^power  →  spacing = targetRadius / (n-1)^power
-    return targetRadius / Math.pow(Math.max(1, n - 1), power);
+    // rMax = spacing * sqrt(n-1)  →  spacing = targetRadius / sqrt(n-1)
+    return targetRadius / Math.sqrt(Math.max(1, n - 1));
   }
 
   function autoFit() {
@@ -332,6 +397,12 @@
       if (fill) {
         ctx.fillStyle = dot.color;
         ctx.fill();
+        if (dot.strokeColor) {
+          // Dual color: fill shows CW family, outline shows CCW family
+          ctx.strokeStyle = dot.strokeColor;
+          ctx.lineWidth = Math.max(1, mmToPx(0.3));
+          ctx.stroke();
+        }
       } else {
         ctx.strokeStyle = dot.color;
         ctx.lineWidth = Math.max(0.5, mmToPx(0.15));
@@ -361,11 +432,11 @@
     const s = parseFloat(elSpacing.value);
     const p = parseFloat(elRadialPower.value);
     const pattern = elPatternType.value;
-    const rMax = (s * Math.pow(Math.max(1, n - 1), p)).toFixed(1);
+    const rMax = (s * Math.sqrt(Math.max(1, n - 1))).toFixed(1);
     if (pattern === 'double-spiral') {
-      elInfoStats.textContent = `${fibCW} CW \u00d7 ${fibCCW} CCW spirals | Radius: ${rMax} mm | Dots: ${n * 2}`;
+      elInfoStats.textContent = `${fibCW} CW \u00d7 ${fibCCW} CCW spirals | Radius: ${rMax} mm | Dots: ${n} \u00d7 2 = ${n * 2}`;
     } else {
-      elInfoStats.textContent = `Pattern: ${pattern} | Radius: ${rMax} mm | Dots: ${n} | r = ${s} \u00d7 n^${p.toFixed(2)}`;
+      elInfoStats.textContent = `Pattern: ${pattern} | Radius: ${rMax} mm | Dots: ${n} | Power: ${p.toFixed(2)}`;
     }
   }
 
@@ -460,21 +531,22 @@
   // ─── Slider Value Display Updater ─────────────────────
 
   function updateSliderDisplays() {
-    elNumDotsValue.textContent = elNumDots.value;
-    elSpacingValue.textContent = parseFloat(elSpacing.value).toFixed(1);
-    elDotSizeValue.textContent = parseFloat(elDotSize.value).toFixed(1);
-    elRadialPowerValue.textContent = parseFloat(elRadialPower.value).toFixed(2);
-    elDotOpacityValue.textContent = parseFloat(elDotOpacity.value).toFixed(2);
-    elStartAngleValue.textContent = elStartAngle.value;
-    elGoldenAngleValue.textContent = parseFloat(elGoldenAngle.value).toFixed(3);
-    elPineconeScaleValue.textContent = parseFloat(elPineconeScale.value).toFixed(2);
-    elSpiralBOffsetValue.textContent = elSpiralBOffset.value;
+    elNumDotsValue.value = elNumDots.value;
+    elSpacingValue.value = parseFloat(elSpacing.value).toFixed(1);
+    elDotSizeValue.value = parseFloat(elDotSize.value).toFixed(1);
+    elRadialPowerValue.value = parseFloat(elRadialPower.value).toFixed(2);
+    elDotOpacityValue.value = parseFloat(elDotOpacity.value).toFixed(2);
+    elStartAngleValue.value = elStartAngle.value;
+    elGoldenAngleValue.value = parseFloat(elGoldenAngle.value).toFixed(3);
+    elPineconeScaleValue.value = parseFloat(elPineconeScale.value).toFixed(2);
+    elSpiralBOffsetValue.value = elSpiralBOffset.value;
+    elCenterPackingValue.value = parseFloat(elCenterPacking.value).toFixed(1);
   }
 
   // ─── Event Wiring ────────────────────────────────────
 
   // Sliders drive live redraws
-  [elNumDots, elSpacing, elDotSize, elRadialPower, elDotOpacity, elStartAngle, elPineconeScale, elSpiralBOffset].forEach(slider => {
+  [elNumDots, elSpacing, elDotSize, elRadialPower, elDotOpacity, elStartAngle, elPineconeScale, elSpiralBOffset, elCenterPacking].forEach(slider => {
     slider.addEventListener('input', () => {
       updateSliderDisplays();
       draw();
@@ -486,14 +558,47 @@
     cb.addEventListener('change', draw);
   });
 
+  // Number input fields sync back to sliders
+  const sliderInputPairs = [
+    [elNumDots, elNumDotsValue],
+    [elSpacing, elSpacingValue],
+    [elDotSize, elDotSizeValue],
+    [elRadialPower, elRadialPowerValue],
+    [elDotOpacity, elDotOpacityValue],
+    [elStartAngle, elStartAngleValue],
+    [elPineconeScale, elPineconeScaleValue],
+    [elSpiralBOffset, elSpiralBOffsetValue],
+    [elCenterPacking, elCenterPackingValue]
+  ];
+  sliderInputPairs.forEach(([slider, numInput]) => {
+    numInput.addEventListener('input', () => {
+      slider.value = numInput.value;
+      draw();
+    });
+  });
+  // Golden angle number input (no snap when typing directly)
+  elGoldenAngleValue.addEventListener('input', () => {
+    elGoldenAngle.value = elGoldenAngleValue.value;
+    draw();
+  });
+
   // Pattern type selector
   elPatternType.addEventListener('change', () => {
     const pattern = elPatternType.value;
     const isDouble = pattern === 'double-spiral';
+    // Update color label
+    document.querySelector('label[for="dotColor"]').textContent = isDouble ? 'Spiral A Color' : 'Dot Color';
+    // Double spiral: show Spiral B color, offset, and fib pair buttons
     elDotColor2Row.style.display = isDouble ? 'flex' : 'none';
     elSpiralBOffsetRow.style.display = isDouble ? 'block' : 'none';
     elFibPairRow.style.display = isDouble ? 'block' : 'none';
     elPineconeScaleRow.style.display = pattern === 'pinecone' ? 'block' : 'none';
+    // Single-spiral family presets only for non-double modes
+    if (isDouble) {
+      elSpiralCountRow.style.display = 'none';
+    } else {
+      elSpiralCountRow.style.display = elColorSpirals.checked ? 'block' : 'none';
+    }
     draw();
   });
 
@@ -512,7 +617,11 @@
 
   // Spiral highlighting toggle
   elColorSpirals.addEventListener('change', () => {
-    elSpiralCountRow.style.display = elColorSpirals.checked ? 'block' : 'none';
+    const pattern = elPatternType.value;
+    const isDouble = pattern === 'double-spiral';
+    if (!isDouble) {
+      elSpiralCountRow.style.display = elColorSpirals.checked ? 'block' : 'none';
+    }
     draw();
   });
 
@@ -569,11 +678,14 @@
     elPatternType.value  = DEFAULTS.patternType;
     elPineconeScale.value = DEFAULTS.pineconeScale;
     elSpiralBOffset.value  = DEFAULTS.spiralBOffset;
+    elCenterPacking.value  = DEFAULTS.centerPacking;
     elFillDots.checked   = DEFAULTS.fillDots;
     elColorSpirals.checked = DEFAULTS.colorSpirals;
     elGradientSize.checked = DEFAULTS.gradientSize;
-    elSpiralCountRow.style.display = 'none';
-    elDotColor2Row.style.display   = 'none';
+    // Reset visibility — defaults to sunflower, spirals not highlighted
+    document.querySelector('label[for=\"dotColor\"]').textContent = 'Dot Color';
+    elSpiralCountRow.style.display   = 'none';
+    elDotColor2Row.style.display     = 'none';
     elSpiralBOffsetRow.style.display = 'none';
     elFibPairRow.style.display       = 'none';
     elPineconeScaleRow.style.display = 'none';
