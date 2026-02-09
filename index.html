@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunflower Fibonacci Pattern Generator</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Controls Panel -->
+    <aside class="controls-panel">
+      <h1>Sunflower Fibonacci</h1>
+      <p class="subtitle">Interactive pattern generator for CAD workflows</p>
+
+      <section class="control-group">
+        <h2>Canvas Size</h2>
+        <div class="input-row">
+          <label for="canvasWidth">Width (mm)</label>
+          <input type="number" id="canvasWidth" value="200" min="50" max="1000" step="10">
+        </div>
+        <div class="input-row">
+          <label for="canvasHeight">Height (mm)</label>
+          <input type="number" id="canvasHeight" value="200" min="50" max="1000" step="10">
+        </div>
+        <div class="button-row">
+          <button id="applyCanvasSize" class="btn">Apply Size</button>
+          <button id="autoFit" class="btn btn-accent" title="Auto-calculate spacing to fill canvas">Auto-Fit</button>
+        </div>
+      </section>
+
+      <section class="control-group">
+        <h2>Pattern Controls</h2>
+        <div class="slider-row">
+          <label for="numDots">Number of Dots</label>
+          <div class="slider-with-value">
+            <input type="range" id="numDots" min="1" max="5000" value="1500" step="1">
+            <span id="numDotsValue" class="value-display">1500</span>
+          </div>
+        </div>
+
+        <div class="slider-row">
+          <label for="spacing">Spacing Factor (mm)</label>
+          <div class="slider-with-value">
+            <input type="range" id="spacing" min="0.1" max="15" value="2.2" step="0.1">
+            <span id="spacingValue" class="value-display">2.2</span>
+          </div>
+        </div>
+
+        <div class="slider-row">
+          <label for="radialPower">Radial Power (n<sup>x</sup>)</label>
+          <div class="slider-with-value">
+            <input type="range" id="radialPower" min="0.1" max="1.5" value="0.5" step="0.01">
+            <span id="radialPowerValue" class="value-display">0.50</span>
+          </div>
+          <span class="hint">0.5 = classic sunflower (Fermat spiral)</span>
+        </div>
+
+        <div class="slider-row">
+          <label for="dotSize">Dot Size (mm)</label>
+          <div class="slider-with-value">
+            <input type="range" id="dotSize" min="0.2" max="5" value="1.0" step="0.1">
+            <span id="dotSizeValue" class="value-display">1.0</span>
+          </div>
+        </div>
+
+        <div class="slider-row">
+          <label for="dotOpacity">Dot Opacity</label>
+          <div class="slider-with-value">
+            <input type="range" id="dotOpacity" min="0.05" max="1" value="1" step="0.05">
+            <span id="dotOpacityValue" class="value-display">1.00</span>
+          </div>
+        </div>
+
+        <div class="slider-row">
+          <label for="goldenAngle">Golden Angle (&deg;)</label>
+          <div class="slider-with-value">
+            <input type="range" id="goldenAngle" min="100" max="180" value="137.508" step="0.001">
+            <span id="goldenAngleValue" class="value-display">137.508</span>
+          </div>
+          <button id="snapGoldenAngle" class="btn btn-small" title="Snap to true golden angle">&#x1F33B; 137.508&deg;</button>
+        </div>
+
+        <div class="slider-row">
+          <label for="startAngle">Start Angle Offset (&deg;)</label>
+          <div class="slider-with-value">
+            <input type="range" id="startAngle" min="0" max="360" value="0" step="1">
+            <span id="startAngleValue" class="value-display">0</span>
+          </div>
+        </div>
+
+        <button id="resetDefaults" class="btn btn-reset">Reset All Defaults</button>
+      </section>
+
+      <section class="control-group">
+        <h2>Display Options</h2>
+        <div class="checkbox-row">
+          <input type="checkbox" id="showGrid" checked>
+          <label for="showGrid">Show mm grid</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="showMajorGrid" checked>
+          <label for="showMajorGrid">Show 10mm grid</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="showAxes" checked>
+          <label for="showAxes">Show center axes</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="showLabels" checked>
+          <label for="showLabels">Show scale labels</label>
+        </div>
+      </section>
+
+      <section class="control-group">
+        <h2>Dot Style</h2>
+        <div class="input-row">
+          <label for="dotColor">Dot Color</label>
+          <input type="color" id="dotColor" value="#d4a017">
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="fillDots" checked>
+          <label for="fillDots">Fill dots</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="colorSpirals">
+          <label for="colorSpirals">Highlight spiral arms</label>
+        </div>
+        <div class="slider-row" id="spiralCountRow" style="display:none; margin-top:8px;">
+          <label for="spiralCount">Spiral families</label>
+          <div class="spiral-presets">
+            <button class="btn btn-tiny spiral-preset" data-val="8">8</button>
+            <button class="btn btn-tiny spiral-preset" data-val="13">13</button>
+            <button class="btn btn-tiny spiral-preset active" data-val="21">21</button>
+            <button class="btn btn-tiny spiral-preset" data-val="34">34</button>
+            <button class="btn btn-tiny spiral-preset" data-val="55">55</button>
+          </div>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="gradientSize">
+          <label for="gradientSize">Size gradient (inner &rarr; outer)</label>
+        </div>
+      </section>
+
+      <section class="control-group">
+        <h2>Export</h2>
+        <div class="export-buttons">
+          <button id="exportPNG" class="btn">Export PNG</button>
+          <button id="exportSVG" class="btn">Export SVG</button>
+        </div>
+      </section>
+
+      <section class="control-group info">
+        <h2>Info</h2>
+        <p>Golden angle: <strong>137.508&deg;</strong></p>
+        <p>Dot positions follow:<br>
+          <code>r = spacing &times; n<sup>power</sup></code><br>
+          <code>&theta; = n &times; golden_angle + offset</code>
+        </p>
+        <p id="infoStats" class="stats"></p>
+      </section>
+    </aside>
+
+    <!-- Canvas Area -->
+    <main class="canvas-area">
+      <canvas id="sunflowerCanvas"></canvas>
+    </main>
+  </div>
+
+  <script src="js/sunflower.js"></script>
+</body>
+</html>

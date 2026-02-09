@@ -1,0 +1,14 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Open Sunflower App",
+			"type": "shell",
+			"command": "start",
+			"args": [
+				"c:\\git\\sunflower-fibonacci\\index.html"
+			],
+			"group": "build"
+		}
+	]
+}
