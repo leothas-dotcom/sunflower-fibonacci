@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sunflower Fibonacci Pattern Generator</title>
+    <title>Fibonacci Pattern Generator</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -31,6 +31,15 @@
 
       <section class="control-group">
         <h2>Pattern Controls</h2>
+        <div class="input-row">
+          <label for="patternType">Pattern</label>
+          <select id="patternType">
+            <option value="sunflower" selected>&#x1F33B; Sunflower</option>
+            <option value="pinecone">&#x1F33E; Pinecone</option>
+            <option value="double-spiral">&#x1F300; Double Spiral</option>
+          </select>
+        </div>
+
         <div class="slider-row">
           <label for="numDots">Number of Dots</label>
           <div class="slider-with-value">
@@ -122,6 +131,27 @@
           <input type="checkbox" id="fillDots" checked>
           <label for="fillDots">Fill dots</label>
         </div>
+        <div class="input-row" id="dotColor2Row" style="display:none;">
+          <label for="dotColor2">Spiral B Color</label>
+          <input type="color" id="dotColor2" value="#4363d8">
+        </div>
+        <div class="slider-row" id="spiralBOffsetRow" style="display:none;">
+          <label for="spiralBOffset">Spiral B Offset (&deg;)</label>
+          <div class="slider-with-value">
+            <input type="range" id="spiralBOffset" min="0" max="360" value="0" step="1">
+            <span id="spiralBOffsetValue" class="value-display">0</span>
+          </div>
+        </div>
+        <div class="slider-row" id="fibPairRow" style="display:none;">
+          <label>Spiral families (CW / CCW)</label>
+          <div class="spiral-presets">
+            <button class="btn btn-tiny fib-pair" data-cw="8" data-ccw="13">8/13</button>
+            <button class="btn btn-tiny fib-pair" data-cw="13" data-ccw="21">13/21</button>
+            <button class="btn btn-tiny fib-pair active" data-cw="21" data-ccw="34">21/34</button>
+            <button class="btn btn-tiny fib-pair" data-cw="34" data-ccw="55">34/55</button>
+          </div>
+          <span class="hint">Successive Fibonacci numbers</span>
+        </div>
         <div class="checkbox-row">
           <input type="checkbox" id="colorSpirals">
           <label for="colorSpirals">Highlight spiral arms</label>
@@ -135,6 +165,14 @@
             <button class="btn btn-tiny spiral-preset" data-val="34">34</button>
             <button class="btn btn-tiny spiral-preset" data-val="55">55</button>
           </div>
+        </div>
+        <div class="slider-row" id="pineconeScaleRow" style="display:none;">
+          <label for="pineconeScale">Pinecone Scale Gradient</label>
+          <div class="slider-with-value">
+            <input type="range" id="pineconeScale" min="0" max="1" value="0.7" step="0.05">
+            <span id="pineconeScaleValue" class="value-display">0.70</span>
+          </div>
+          <span class="hint">0 = uniform, 1 = tiny center &rarr; full edge</span>
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="gradientSize">

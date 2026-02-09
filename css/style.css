@@ -82,6 +82,22 @@ body {
   text-align: right;
 }
 
+.input-row select {
+  width: 160px;
+  padding: 4px 8px;
+  background: #0d1b36;
+  border: 1px solid #3a3a6a;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.input-row select:focus {
+  border-color: #e0ca3c;
+  outline: none;
+}
+
 .input-row input[type="color"] {
   width: 40px;
   height: 28px;

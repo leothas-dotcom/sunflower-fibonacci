@@ -62,6 +62,16 @@
   const elGoldenAngle  = document.getElementById('goldenAngle');
   const elGoldenAngleValue = document.getElementById('goldenAngleValue');
   const elSnapGoldenAngle = document.getElementById('snapGoldenAngle');
+  const elPatternType  = document.getElementById('patternType');
+  const elDotColor2    = document.getElementById('dotColor2');
+  const elDotColor2Row = document.getElementById('dotColor2Row');
+  const elSpiralBOffset = document.getElementById('spiralBOffset');
+  const elSpiralBOffsetValue = document.getElementById('spiralBOffsetValue');
+  const elSpiralBOffsetRow = document.getElementById('spiralBOffsetRow');
+  const elFibPairRow   = document.getElementById('fibPairRow');
+  const elPineconeScale = document.getElementById('pineconeScale');
+  const elPineconeScaleValue = document.getElementById('pineconeScaleValue');
+  const elPineconeScaleRow = document.getElementById('pineconeScaleRow');
   const elResetDefaults = document.getElementById('resetDefaults');
   const elExportPNG    = document.getElementById('exportPNG');
   const elExportSVG    = document.getElementById('exportSVG');
@@ -83,6 +93,10 @@
     showAxes: true,
     showLabels: true,
     dotColor: '#d4a017',
+    dotColor2: '#4363d8',
+    patternType: 'sunflower',
+    pineconeScale: 0.7,
+    spiralBOffset: 0,
     fillDots: true,
     colorSpirals: false,
     gradientSize: false
@@ -95,11 +109,85 @@
   let widthMM  = parseFloat(elCanvasWidth.value);
   let heightMM = parseFloat(elCanvasHeight.value);
   let spiralFamilies = 21; // default Fibonacci number for spiral coloring
+  let fibCW = 21;  // clockwise spiral family count
+  let fibCCW = 34; // counter-clockwise spiral family count
 
   // ─── Helpers ──────────────────────────────────────────
 
   function mmToPx(mm) {
     return mm * PX_PER_MM;
+  }
+
+  /** Compute all dot positions, sizes, and colors for the active pattern */
+  function computeDots() {
+    const n         = parseInt(elNumDots.value, 10);
+    const spacingMM = parseFloat(elSpacing.value);
+    const power     = parseFloat(elRadialPower.value);
+    const baseDotMM = parseFloat(elDotSize.value);
+    const color     = elDotColor.value;
+    const spiralCol = elColorSpirals.checked;
+    const gradSize  = elGradientSize.checked;
+    const pattern   = elPatternType.value;
+
+    const angleDeg  = parseFloat(elGoldenAngle.value);
+    const angleRad  = angleDeg * (Math.PI / 180);
+    const offsetRad = parseFloat(elStartAngle.value) * (Math.PI / 180);
+    const rMax      = spacingMM * Math.pow(Math.max(1, n - 1), power);
+
+    const dots = [];
+
+    const addDots = (count, extraOffset, baseColor, reverseAngle) => {
+      const sign = reverseAngle ? -1 : 1;
+      // For double spiral, color by the appropriate Fibonacci family count
+      const armCount = (pattern === 'double-spiral')
+        ? (reverseAngle ? fibCCW : fibCW)
+        : spiralFamilies;
+      for (let i = 0; i < count; i++) {
+        const rMM   = spacingMM * Math.pow(i, power);
+        const theta = i * angleRad * sign + offsetRad + extraOffset;
+
+        // Dot radius
+        let dotRadMM = baseDotMM / 2;
+        if (pattern === 'pinecone' && gradSize) {
+          // Pinecone + gradient: smallest at center, largest at edge
+          const t = count > 1 ? i / (count - 1) : 0;
+          const scale = parseFloat(elPineconeScale.value);
+          dotRadMM *= (1 - scale) + scale * t;
+        } else if (gradSize && rMax > 0) {
+          const t = rMM / rMax;
+          dotRadMM *= (0.3 + 0.7 * t);
+        }
+
+        // Color
+        let dotColor = baseColor;
+        if (spiralCol) {
+          const family = i % armCount;
+          dotColor = SPIRAL_PALETTE[family % SPIRAL_PALETTE.length];
+        }
+
+        dots.push({
+          xMM: rMM * Math.cos(theta),
+          yMM: rMM * Math.sin(theta),
+          radiusMM: dotRadMM,
+          theta: theta,
+          color: dotColor
+        });
+      }
+    };
+
+    if (pattern === 'double-spiral') {
+      // Two separate spirals: CW (positive angle) and CCW (negative angle)
+      const color2 = elDotColor2.value;
+      const bOffsetRad = parseFloat(elSpiralBOffset.value) * (Math.PI / 180);
+      // Spiral A: fibCW arms, clockwise
+      addDots(n, 0, color, false);
+      // Spiral B: fibCCW arms, counter-clockwise, with independent offset
+      addDots(n, bOffsetRad, color2, true);
+    } else {
+      addDots(n, 0, color, false);
+    }
+
+    return dots;
   }
 
   /** Calculate optimal spacing so pattern fills ~85% of the smaller canvas dimension */
@@ -207,56 +295,45 @@
   // ─── Drawing: Sunflower Pattern ───────────────────────
 
   function drawSunflower() {
-    const n         = parseInt(elNumDots.value, 10);
-    const spacingMM = parseFloat(elSpacing.value);
-    const power     = parseFloat(elRadialPower.value);
-    const baseDotMM = parseFloat(elDotSize.value);
-    const opacity   = parseFloat(elDotOpacity.value);
-    const color     = elDotColor.value;
-    const fill      = elFillDots.checked;
-    const spiralCol = elColorSpirals.checked;
-    const gradSize  = elGradientSize.checked;
-
-    const angleDeg  = parseFloat(elGoldenAngle.value);
-    const angleRad  = angleDeg * (Math.PI / 180);
-    const offsetRad = parseFloat(elStartAngle.value) * (Math.PI / 180);
+    const opacity = parseFloat(elDotOpacity.value);
+    const fill    = elFillDots.checked;
+    const pattern = elPatternType.value;
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
-
-    // Max radius for gradient sizing
-    const rMax = spacingMM * Math.pow(Math.max(1, n - 1), power);
+    const dots = computeDots();
 
     ctx.globalAlpha = opacity;
 
-    for (let i = 0; i < n; i++) {
-      const rMM   = spacingMM * Math.pow(i, power);
-      const theta = i * angleRad + offsetRad;
-      const x = cx + mmToPx(rMM) * Math.cos(theta);
-      const y = cy + mmToPx(rMM) * Math.sin(theta);
+    for (const dot of dots) {
+      const x = cx + mmToPx(dot.xMM);
+      const y = cy + mmToPx(dot.yMM);
+      const sizePx = mmToPx(dot.radiusMM);
 
-      // Dot radius: optionally scale from 30% at center to 100% at edge
-      let dotRadMM = baseDotMM / 2;
-      if (gradSize && rMax > 0) {
-        const t = rMM / rMax; // 0 at center, 1 at edge
-        dotRadMM *= (0.3 + 0.7 * t);
+      if (pattern === 'pinecone') {
+        // Diamond oriented radially — long axis 2×, short axis 1×
+        const angle = dot.theta;
+        const longR  = sizePx * 2;
+        const shortR = sizePx * 0.9;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.moveTo(longR, 0);          // tip along radial
+        ctx.lineTo(0, shortR);          // right
+        ctx.lineTo(-longR, 0);          // inner tip
+        ctx.lineTo(0, -shortR);         // left
+        ctx.closePath();
+        ctx.restore();
+      } else {
+        ctx.beginPath();
+        ctx.arc(x, y, sizePx, 0, 2 * Math.PI);
       }
-      const dotPx = mmToPx(dotRadMM);
-
-      // Choose color
-      let dotColor = color;
-      if (spiralCol) {
-        const family = i % spiralFamilies;
-        dotColor = SPIRAL_PALETTE[family % SPIRAL_PALETTE.length];
-      }
-
-      ctx.beginPath();
-      ctx.arc(x, y, dotPx, 0, 2 * Math.PI);
 
       if (fill) {
-        ctx.fillStyle = dotColor;
+        ctx.fillStyle = dot.color;
         ctx.fill();
       } else {
-        ctx.strokeStyle = dotColor;
+        ctx.strokeStyle = dot.color;
         ctx.lineWidth = Math.max(0.5, mmToPx(0.15));
         ctx.stroke();
       }
@@ -283,15 +360,21 @@
     const n = parseInt(elNumDots.value, 10);
     const s = parseFloat(elSpacing.value);
     const p = parseFloat(elRadialPower.value);
+    const pattern = elPatternType.value;
     const rMax = (s * Math.pow(Math.max(1, n - 1), p)).toFixed(1);
-    elInfoStats.textContent = `Pattern radius: ${rMax} mm | Dots: ${n} | r = ${s} × n^${p.toFixed(2)}`;
+    if (pattern === 'double-spiral') {
+      elInfoStats.textContent = `${fibCW} CW \u00d7 ${fibCCW} CCW spirals | Radius: ${rMax} mm | Dots: ${n * 2}`;
+    } else {
+      elInfoStats.textContent = `Pattern: ${pattern} | Radius: ${rMax} mm | Dots: ${n} | r = ${s} \u00d7 n^${p.toFixed(2)}`;
+    }
   }
 
   // ─── Export: PNG ──────────────────────────────────────
 
   function exportPNG() {
+    const pattern = elPatternType.value;
     const link = document.createElement('a');
-    link.download = `sunflower_${widthMM}x${heightMM}mm.png`;
+    link.download = `${pattern}_${widthMM}x${heightMM}mm.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   }
@@ -299,22 +382,11 @@
   // ─── Export: SVG ──────────────────────────────────────
 
   function exportSVG() {
-    const n = parseInt(elNumDots.value, 10);
-    const spacingMM = parseFloat(elSpacing.value);
-    const baseDotMM = parseFloat(elDotSize.value);
-    const power = parseFloat(elRadialPower.value);
     const opacity = parseFloat(elDotOpacity.value);
-    const color = elDotColor.value;
     const fill = elFillDots.checked;
-    const spiralCol = elColorSpirals.checked;
-    const gradSize = elGradientSize.checked;
     const cxMM = widthMM / 2;
     const cyMM = heightMM / 2;
-
-    const angleDeg = parseFloat(elGoldenAngle.value);
-    const angleRad = angleDeg * (Math.PI / 180);
-    const offsetRad = parseFloat(elStartAngle.value) * (Math.PI / 180);
-    const rMax = spacingMM * Math.pow(Math.max(1, n - 1), power);
+    const dots = computeDots();
 
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${widthMM}mm" height="${heightMM}mm" viewBox="0 0 ${widthMM} ${heightMM}">\n`;
     svg += `  <rect width="${widthMM}" height="${heightMM}" fill="white"/>\n`;
@@ -342,28 +414,36 @@
     }
 
     // Dots
-    for (let i = 0; i < n; i++) {
-      const rMM = spacingMM * Math.pow(i, power);
-      const theta = i * angleRad + offsetRad;
-      const x = (cxMM + rMM * Math.cos(theta)).toFixed(3);
-      const y = (cyMM + rMM * Math.sin(theta)).toFixed(3);
+    const pattern = elPatternType.value;
+    for (const dot of dots) {
+      const cx = (cxMM + dot.xMM).toFixed(3);
+      const cy = (cyMM + dot.yMM).toFixed(3);
 
-      let dotRadMM = baseDotMM / 2;
-      if (gradSize && rMax > 0) {
-        const t = rMM / rMax;
-        dotRadMM *= (0.3 + 0.7 * t);
-      }
+      if (pattern === 'pinecone') {
+        // Diamond shape oriented along radial direction
+        const longR  = dot.radiusMM * 2;
+        const shortR = dot.radiusMM * 0.9;
+        const angleDegSVG = (dot.theta * 180 / Math.PI).toFixed(2);
+        // Diamond points relative to center, then rotated
+        const points = [
+          [longR, 0], [0, shortR], [-longR, 0], [0, -shortR]
+        ].map(([px, py]) => {
+          const cos = Math.cos(dot.theta);
+          const sin = Math.sin(dot.theta);
+          return `${(cxMM + dot.xMM + px * cos - py * sin).toFixed(3)},${(cyMM + dot.yMM + px * sin + py * cos).toFixed(3)}`;
+        }).join(' ');
 
-      let dotColor = color;
-      if (spiralCol) {
-        const family = i % spiralFamilies;
-        dotColor = SPIRAL_PALETTE[family % SPIRAL_PALETTE.length];
-      }
-
-      if (fill) {
-        svg += `    <circle cx="${x}" cy="${y}" r="${dotRadMM.toFixed(3)}" fill="${dotColor}" opacity="${opacity}"/>\n`;
+        if (fill) {
+          svg += `    <polygon points="${points}" fill="${dot.color}" opacity="${opacity}"/>\n`;
+        } else {
+          svg += `    <polygon points="${points}" fill="none" stroke="${dot.color}" stroke-width="0.15" opacity="${opacity}"/>\n`;
+        }
       } else {
-        svg += `    <circle cx="${x}" cy="${y}" r="${dotRadMM.toFixed(3)}" fill="none" stroke="${dotColor}" stroke-width="0.15" opacity="${opacity}"/>\n`;
+        if (fill) {
+          svg += `    <circle cx="${cx}" cy="${cy}" r="${dot.radiusMM.toFixed(3)}" fill="${dot.color}" opacity="${opacity}"/>\n`;
+        } else {
+          svg += `    <circle cx="${cx}" cy="${cy}" r="${dot.radiusMM.toFixed(3)}" fill="none" stroke="${dot.color}" stroke-width="0.15" opacity="${opacity}"/>\n`;
+        }
       }
     }
 
@@ -371,7 +451,7 @@
 
     const blob = new Blob([svg], { type: 'image/svg+xml' });
     const link = document.createElement('a');
-    link.download = `sunflower_${widthMM}x${heightMM}mm.svg`;
+    link.download = `${pattern}_${widthMM}x${heightMM}mm.svg`;
     link.href = URL.createObjectURL(blob);
     link.click();
     URL.revokeObjectURL(link.href);
@@ -387,12 +467,14 @@
     elDotOpacityValue.textContent = parseFloat(elDotOpacity.value).toFixed(2);
     elStartAngleValue.textContent = elStartAngle.value;
     elGoldenAngleValue.textContent = parseFloat(elGoldenAngle.value).toFixed(3);
+    elPineconeScaleValue.textContent = parseFloat(elPineconeScale.value).toFixed(2);
+    elSpiralBOffsetValue.textContent = elSpiralBOffset.value;
   }
 
   // ─── Event Wiring ────────────────────────────────────
 
   // Sliders drive live redraws
-  [elNumDots, elSpacing, elDotSize, elRadialPower, elDotOpacity, elStartAngle].forEach(slider => {
+  [elNumDots, elSpacing, elDotSize, elRadialPower, elDotOpacity, elStartAngle, elPineconeScale, elSpiralBOffset].forEach(slider => {
     slider.addEventListener('input', () => {
       updateSliderDisplays();
       draw();
@@ -402,6 +484,30 @@
   // Display toggles
   [elShowGrid, elShowMajorGrid, elShowAxes, elShowLabels, elFillDots, elGradientSize].forEach(cb => {
     cb.addEventListener('change', draw);
+  });
+
+  // Pattern type selector
+  elPatternType.addEventListener('change', () => {
+    const pattern = elPatternType.value;
+    const isDouble = pattern === 'double-spiral';
+    elDotColor2Row.style.display = isDouble ? 'flex' : 'none';
+    elSpiralBOffsetRow.style.display = isDouble ? 'block' : 'none';
+    elFibPairRow.style.display = isDouble ? 'block' : 'none';
+    elPineconeScaleRow.style.display = pattern === 'pinecone' ? 'block' : 'none';
+    draw();
+  });
+
+  elDotColor2.addEventListener('input', draw);
+
+  // Fibonacci pair preset buttons (double spiral)
+  document.querySelectorAll('.fib-pair').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.fib-pair').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      fibCW = parseInt(btn.dataset.cw, 10);
+      fibCCW = parseInt(btn.dataset.ccw, 10);
+      draw();
+    });
   });
 
   // Spiral highlighting toggle
@@ -459,13 +565,25 @@
     elShowAxes.checked   = DEFAULTS.showAxes;
     elShowLabels.checked = DEFAULTS.showLabels;
     elDotColor.value     = DEFAULTS.dotColor;
+    elDotColor2.value    = DEFAULTS.dotColor2;
+    elPatternType.value  = DEFAULTS.patternType;
+    elPineconeScale.value = DEFAULTS.pineconeScale;
+    elSpiralBOffset.value  = DEFAULTS.spiralBOffset;
     elFillDots.checked   = DEFAULTS.fillDots;
     elColorSpirals.checked = DEFAULTS.colorSpirals;
     elGradientSize.checked = DEFAULTS.gradientSize;
     elSpiralCountRow.style.display = 'none';
+    elDotColor2Row.style.display   = 'none';
+    elSpiralBOffsetRow.style.display = 'none';
+    elFibPairRow.style.display       = 'none';
+    elPineconeScaleRow.style.display = 'none';
     spiralFamilies = 21;
+    fibCW = 21;
+    fibCCW = 34;
     document.querySelectorAll('.spiral-preset').forEach(b => b.classList.remove('active'));
     document.querySelector('.spiral-preset[data-val="21"]').classList.add('active');
+    document.querySelectorAll('.fib-pair').forEach(b => b.classList.remove('active'));
+    document.querySelector('.fib-pair[data-cw="21"]').classList.add('active');
     updateSliderDisplays();
     applyCanvasSize();
     autoFit();
