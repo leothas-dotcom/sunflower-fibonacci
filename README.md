@@ -1,6 +1,6 @@
 # Sunflower Fibonacci Pattern Generator
 
-An interactive web-based tool for generating Fibonacci sunflower spiral patterns, designed for CAD tracing workflows. Supports sunflower, pinecone (diamond shapes), and double-spiral modes with full SVG/DXF export.
+An interactive web-based tool for generating Fibonacci spiral and geometric patterns, designed for CAD tracing workflows. Supports sunflower, pinecone, double-spiral, circle, rectangle, and triangle modes with full SVG/DXF export.
 
 **[Live Demo](https://leothas-dotcom.github.io/sunflower-fibonacci/)**
 
@@ -10,20 +10,32 @@ An interactive web-based tool for generating Fibonacci sunflower spiral patterns
 |-----------|----------|---------------|
 | ![Sunflower Pattern](docs/screenshot-sunflower.png) | ![Pinecone Pattern](docs/screenshot-pinecone.png) | ![Double Spiral Pattern](docs/screenshot-double-spiral.png) |
 
+| Circle | Rectangle | Triangle |
+|--------|-----------|----------|
+| ![Circle Pattern](docs/screenshot-shape-circle.png) | ![Rectangle Pattern](docs/screenshot-shape-rectangle.png) | ![Triangle Pattern](docs/screenshot-shape-triangle.png) |
+
 > **Note:** Add screenshots to the `docs/` folder to make them visible here.
 
 ## Features
 
 ### Pattern Modes
-- **Sunflower** — Classic Fibonacci phyllotaxis using the golden angle (137.508°)
-- **Pinecone** — Diamond/rhombus shapes oriented radially, with scale gradient
-- **Double Spiral** — Two overlaid dot sets with configurable Fibonacci family pairs (8/13, 13/21, 21/34, 34/55)
+- **Spirals**:
+  - **Sunflower** — Classic Fibonacci phyllotaxis using the golden angle (137.508°)
+  - **Pinecone** — Diamond/rhombus shapes oriented radially, with scale gradient
+  - **Double Spiral** — Two overlaid dot sets with configurable Fibonacci family pairs
+- **Geometric Shapes**:
+  - **Circle**, **Rectangle**, **Triangle** — Dots arranged in basic geometric forms
+  - Supports outline or uniform-filled distributions
+
+### Dynamic UI
+- Controls are automatically shown or hidden based on the selected pattern.
 
 ### Interactive Controls
 | Control | Range | Default | Description |
 |---------|-------|---------|-------------|
-| Number of Dots | 1–5,000 | 500 | Total seeds in the pattern |
+| Number of Dots | 1–5,000 | 50 | Total seeds in the pattern |
 | Spacing Factor | 0.1–15 mm | Auto-fit | Distance scaling between dots |
+| Edge Margin | 0-49 mm | 5 | Universal margin for all patterns on auto-fit |
 | Radial Power | 0.1–1.5 | 0.50 | Density distribution (0.5 = classic Fermat √n) |
 | Center Packing | 0–3 | 0 | Higher = denser center |
 | Dot Max Size | 0.2–5 mm | 1.0 | Maximum dot radius |
@@ -32,13 +44,16 @@ An interactive web-based tool for generating Fibonacci sunflower spiral patterns
 | Golden Angle | 100–180° | 137.508° | Divergence angle (snaps to true golden angle) |
 | Start Angle Offset | 0–360° | 0° | Rotates the entire pattern |
 | Pinecone Scale | 0–1 | 0.70 | Diamond size scaling from center to edge |
-| Spiral B Offset | 0–360° | 0° | Angular offset for second spiral set |
-| Center Packing | 0–3 | 0 | Packs more dots toward the center |
+| Spiral B Offset | 0–360° | 180° | Angular offset for second spiral set |
+| Shape Size | 1-100% | 90% | Size of the geometric shape relative to canvas |
+| Shape Fill Mode | Outline/Filled | Outline | Distributes dots on the edge or inside the shape |
+| Hole Size Mode | Uniform/Fibonacci | Fibonacci | Sets dot sizes uniformly or in Fibonacci-grouped sizes |
 
 ### Size Gradient
 - **None** — All dots are the same size (max size)
 - **Inner → Outer** — Small at center, large at edge
 - **Outer → Inner** — Large at center, small at edge
+- **Fibonacci Groups** (Shapes) — Groups dots into Fibonacci-sized clusters
 
 ### Canvas & Grid
 - **Editable Canvas Size** — Width and height in millimeters (default 100×100 mm)
